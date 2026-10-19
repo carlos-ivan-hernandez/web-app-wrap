@@ -190,9 +190,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowDidExitFullScreen(_ notification: Notification) {
         tabStrip.leadingInset = Self.stripInsetForTrafficLights
-        let palette = StripPalette(color: appDelegate.config.titleBarColor)
-        tabStrip.palette = palette
-        window.backgroundColor = palette.background
         layoutTrafficLights()
     }
 

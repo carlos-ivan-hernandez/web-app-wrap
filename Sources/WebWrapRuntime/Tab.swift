@@ -1,5 +1,5 @@
 import AppKit
-import WebKit
+@preconcurrency import WebKit
 import WebWrapKit
 
 /// One tab: a web view plus the policies for where its links go.

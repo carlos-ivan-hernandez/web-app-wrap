@@ -1,5 +1,5 @@
 import AppKit
-import WebKit
+@preconcurrency import WebKit
 
 /// Saves downloads straight to ~/Downloads, like Safari's default.
 final class DownloadManager: NSObject, WKDownloadDelegate {
