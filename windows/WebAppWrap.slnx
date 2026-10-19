@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/WebAppWrap/WebAppWrap.csproj" />
+    <Project Path="src/WebAppWrap.Core/WebAppWrap.Core.csproj" />
+    <Project Path="src/waw/waw.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WebAppWrap.Core.Tests/WebAppWrap.Core.Tests.csproj" />
+  </Folder>
+</Solution>

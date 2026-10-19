@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Everything that isn't UI: input cleanup, link routing, theme colors, batch files,
+       icon drawing, and creating Start Menu shortcuts. Cross-platform so it can be tested anywhere;
+       the Windows-only parts check the OS at runtime. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>WebAppWrap.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.2" Condition="!$([MSBuild]::IsOSPlatform('Windows'))" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WebAppWrap.Core.Tests" />
+  </ItemGroup>
+</Project>
