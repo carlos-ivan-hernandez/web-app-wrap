@@ -46,6 +46,19 @@ struct ContentView: View {
             }
             .controlSize(.small)
 
+            if model.customImage != nil {
+                HStack(spacing: 6) {
+                    Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
+                    Slider(
+                        value: $model.imageZoom,
+                        in: Double(IconSource.zoomRange.lowerBound)...Double(IconSource.zoomRange.upperBound)
+                    )
+                    .controlSize(.small)
+                    Image(systemName: "plus.magnifyingglass").foregroundStyle(.secondary)
+                }
+                .help("Zoom in on the image")
+            }
+
             Text(model.customImage == nil ? "Default icon. Drop an image to use your own." : model.imageFileName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -61,9 +74,13 @@ struct ContentView: View {
     private var fieldsColumn: some View {
         VStack(alignment: .leading, spacing: 16) {
             labeled("App name") {
-                TextField("e.g. Linear", text: $model.displayName)
+                TextField("e.g. Linear, or WebWrap/Linear", text: $model.displayName)
                     .textFieldStyle(.roundedBorder)
-                caption(model.trimmedName.isEmpty ? "Shown in the Dock, menu bar and Finder." : "Bundle ID: \(model.bundleIdentifier)")
+                if model.trimmedName.isEmpty {
+                    caption("Shown in the Dock, menu bar and Finder. Add folders with “/”.")
+                } else {
+                    caption("Saves to \(model.destination.path)")
+                }
             }
 
             labeled("Web address") {
@@ -78,16 +95,6 @@ struct ContentView: View {
                     caption("Enter a web address like example.com or https://example.com/app.", color: .red)
                 }
             }
-
-            if model.customImage != nil {
-                labeled("Icon style") {
-                    Picker("Icon style", selection: $model.imageStyle) {
-                        ForEach(ImageStyle.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -98,7 +105,7 @@ struct ContentView: View {
         HStack(spacing: 10) {
             statusView
             Spacer()
-            Button("Create App…") { model.createApp() }
+            Button("Create App") { model.createApp() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.canBuild)
         }

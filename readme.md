@@ -70,21 +70,20 @@ UNIVERSAL=1 ./scripts/build.sh  # Apple silicon + Intel (needs full Xcode)
 ## Use
 
 1. Open WebWrap.
-2. Enter the app name and the web address. You can leave out `https://`.
+2. Enter the app name and the web address. To save the app in a subfolder of
+   Applications, put the folder in the name: `WebWrap/Photos` creates
+   `/Applications/WebWrap/Photos.app`, and the app is named "Photos". You can leave out `https://`.
    Addresses that start with `localhost` use `http://`.
-3. Optionally, drop an image on the icon area or click **Choose Image…**. PNG,
-   JPEG, HEIC, PDF and ICNS files all work. Without an image, WebWrap draws a
-   colored tile with the app name's first letter.
-4. If you added an image, pick an **Icon style**:
-   - **Fill:** crops the image to fill the rounded square. Use this for photos
-     and square logos. It's the default for images with no transparency.
-   - **Fit on White:** places the image on a white rounded square. Use this
-     for logos on a transparent background. It's the default for those.
-   - **As Is:** uses the image unchanged. Use this for an image that's already a
-     finished macOS icon.
-5. Click **Create App…** and choose where to save. The default is
-   `/Applications`. If an app with that name already exists there, WebWrap
-   moves the old copy to the Trash.
+3. Optionally, drop a square image on the icon area or click **Choose Image…**.
+   PNG, JPEG, HEIC, PDF and ICNS files all work. WebWrap rounds the corners to
+   the macOS icon shape and adds the standard margin and shadow. If you want to
+   crop in, drag the zoom slider under the preview. If the image has a solid-color
+   or transparent border, for example an icon that's already rounded on a white
+   square, the slider starts zoomed in just far enough to crop the border out. Without an image, WebWrap
+   draws a colored tile with the app name's first letter.
+4. Click **Create App**. WebWrap saves the app in `/Applications`. If an app with
+   that name is already there, WebWrap asks before replacing it and moves the old
+   copy to the Trash.
 
 You can recreate an app under the same name, for example to change its icon or
 URL. It keeps its sign-ins, because the app's data is tied to its bundle ID
@@ -94,8 +93,8 @@ URL. It keeps its sign-ins, because the app's data is tied to its bundle ID
 
 ```bash
 WebWrap=/Applications/WebWrap.app/Contents/MacOS/WebWrap
-$WebWrap build --name "Linear" --url linear.app
-$WebWrap build --name "Grafana" --url localhost:3000 --image ~/grafana.png --style fit --out ~/Applications
+$WebWrap build --name "WebWrap/Linear" --url linear.app
+$WebWrap build --name "Grafana" --url localhost:3000 --image ~/grafana.png --zoom 1.2 --out ~/Applications
 $WebWrap icon --name "Linear" --out Linear.icns   # just the icon
 ```
 

@@ -1,30 +1,14 @@
 import AppKit
 
-/// How a user-supplied image becomes an icon.
-enum ImageStyle: String, CaseIterable, Identifiable {
-    /// Cropped to fill the rounded-square tile. Best for photos and square logos.
-    case fill
-    /// Scaled down onto a white tile. Best for logos with a transparent background.
-    case fit
-    /// Used unchanged. For images that are already finished macOS icons.
-    case asIs
-
-    var id: Self { self }
-
-    var label: String {
-        switch self {
-        case .fill: "Fill"
-        case .fit: "Fit on White"
-        case .asIs: "As Is"
-        }
-    }
-}
-
 enum IconSource {
     /// A colored gradient tile (hue derived from `name`) showing an SF Symbol if given,
     /// otherwise the name's first letter.
     case generated(name: String, symbol: String? = nil)
-    case image(NSImage, style: ImageStyle)
+    /// A user image, cropped to fill the rounded-square icon shape. `zoom` > 1 crops in
+    /// further, keeping the image centered.
+    case image(NSImage, zoom: CGFloat = 1)
+
+    static let zoomRange: ClosedRange<CGFloat> = 1...3
 }
 
 /// Draws icons on Apple's macOS grid: an 824pt rounded square centered on a 1024pt canvas.
@@ -121,28 +105,78 @@ enum IconRenderer {
         return file
     }
 
-    /// True if any edge pixel is see-through, i.e. the image is probably a logo on a
-    /// transparent background (or an already-shaped icon) rather than a full-bleed picture.
-    static func hasTransparentEdges(_ image: NSImage) -> Bool {
-        let size = 32
+    // MARK: - Automatic zoom
+
+    /// The smallest zoom at which the icon shape shows only the image's artwork, not its
+    /// background. The background is whatever the four corners share: transparency, or one
+    /// solid color such as a white border around an already-rounded icon. Returns 1 for
+    /// images with no shared corner color, or when no zoom up to the maximum gets clear of it
+    /// (e.g. a small logo on a white page), since cropping wouldn't help there.
+    static func automaticZoom(for image: NSImage) -> CGFloat {
+        guard let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return 1 }
+
+        // Analyze at up to 1024 px on the long side.
+        let factor = min(1, 1024 / CGFloat(max(source.width, source.height, 1)))
+        let width = max(1, Int(CGFloat(source.width) * factor))
+        let height = max(1, Int(CGFloat(source.height) * factor))
         guard let context = CGContext(
-            data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
             space: sRGB, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return false }
+        ) else { return 1 }
+        context.interpolationQuality = .high
+        context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let data = context.data else { return 1 }
 
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        image.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
-        NSGraphicsContext.restoreGraphicsState()
-
-        guard let data = context.data else { return false }
-        let pixels = data.bindMemory(to: UInt8.self, capacity: context.bytesPerRow * size)
-        for y in 0..<size {
-            for x in 0..<size where x == 0 || y == 0 || x == size - 1 || y == size - 1 {
-                if pixels[y * context.bytesPerRow + x * 4 + 3] < 250 { return true }
-            }
+        let bytesPerRow = context.bytesPerRow
+        let pixels = data.bindMemory(to: UInt8.self, capacity: bytesPerRow * height)
+        func rgba(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int, a: Int) {
+            let offset = y * bytesPerRow + x * 4
+            return (Int(pixels[offset]), Int(pixels[offset + 1]), Int(pixels[offset + 2]), Int(pixels[offset + 3]))
         }
-        return false
+        func similar(_ p: (r: Int, g: Int, b: Int, a: Int), _ q: (r: Int, g: Int, b: Int, a: Int)) -> Bool {
+            max(abs(p.r - q.r), abs(p.g - q.g), abs(p.b - q.b), abs(p.a - q.a)) <= 24
+        }
+
+        let corners = [rgba(0, 0), rgba(width - 1, 0), rgba(0, height - 1), rgba(width - 1, height - 1)]
+        let corner = corners[0]
+        let cornerIsTransparent = corners.allSatisfy { $0.a < 128 }
+        guard cornerIsTransparent || corners.allSatisfy({ similar($0, corner) }) else { return 1 }
+
+        func isBackground(_ x: Int, _ y: Int) -> Bool {
+            let pixel = rgba(x, y)
+            return pixel.a < 128 || (!cornerIsTransparent && similar(pixel, corner))
+        }
+
+        // The tile is aspect-filled, so at zoom 1 it spans half the shorter side around the center.
+        let centerX = CGFloat(width) / 2, centerY = CGFloat(height) / 2
+        let halfExtent = CGFloat(min(width, height)) / 2
+
+        // Points just inside the icon outline (same superellipse as `squircle`), as unit offsets.
+        let outline: [CGPoint] = (0..<360).map { step in
+            let angle = CGFloat(step) / 360 * 2 * .pi
+            let c = cos(angle), s = sin(angle)
+            return CGPoint(x: 0.985 * copysign(pow(abs(c), 2 / 5), c), y: 0.985 * copysign(pow(abs(s), 2 / 5), s))
+        }
+        func isClear(at zoom: CGFloat) -> Bool {
+            let reach = halfExtent / zoom
+            for point in outline {
+                let x = min(width - 1, max(0, Int(centerX + point.x * reach)))
+                let y = min(height - 1, max(0, Int(centerY - point.y * reach)))
+                if isBackground(x, y) { return false }
+            }
+            return true
+        }
+
+        let range = IconSource.zoomRange
+        if isClear(at: range.lowerBound) { return range.lowerBound }
+        guard isClear(at: range.upperBound) else { return range.lowerBound }
+        var low = range.lowerBound, high = range.upperBound
+        for _ in 0..<20 {
+            let middle = (low + high) / 2
+            if isClear(at: middle) { high = middle } else { low = middle }
+        }
+        // A little extra so anti-aliased edges don't leave a faint line.
+        return min(range.upperBound, high * 1.01)
     }
 
     // MARK: - Drawing (in 1024pt canvas coordinates)
@@ -156,18 +190,12 @@ enum IconRenderer {
                 drawLetter(of: name)
             }
 
-        case let .image(image, .fill):
+        case let .image(image, zoom):
+            let zoom = min(max(zoom, IconSource.zoomRange.lowerBound), IconSource.zoomRange.upperBound)
+            let grow = tileRect.width * (zoom - 1) / 2
             drawTile(in: context, scale: scale) {
-                drawImage(image, in: tileRect, fill: true)
+                drawImage(image, in: tileRect.insetBy(dx: -grow, dy: -grow), fill: true)
             }
-
-        case let .image(image, .fit):
-            drawTile(in: context, scale: scale) {
-                drawImage(image, in: tileRect.insetBy(dx: 110, dy: 110), fill: false)
-            }
-
-        case let .image(image, .asIs):
-            drawImage(image, in: CGRect(x: 0, y: 0, width: canvas, height: canvas), fill: false)
         }
     }
 

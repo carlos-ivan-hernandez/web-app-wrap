@@ -13,18 +13,23 @@ final class BuilderModel: ObservableObject {
 
     @Published var displayName = ""
     @Published var urlString = ""
-    @Published var imageStyle: ImageStyle = .fill
+    @Published var imageZoom: Double = 1
     @Published private(set) var customImage: NSImage?
     @Published private(set) var imageFileName = ""
     @Published private(set) var status: Status = .idle
 
-    var trimmedName: String { displayName.trimmingCharacters(in: .whitespacesAndNewlines) }
+    static let applicationsFolder = URL(fileURLWithPath: "/Applications", isDirectory: true)
+
+    /// The name field may include folders: "WebWrap/Photos" -> /Applications/WebWrap/Photos.app.
+    var location: AppLocation { AppLocation(displayName) }
+    var trimmedName: String { location.name }
+    var destination: URL { location.bundleURL(in: Self.applicationsFolder) }
     var normalizedURL: URL? { InputNormalizer.normalizeURL(urlString) }
     var bundleIdentifier: String { InputNormalizer.bundleIdentifier(for: trimmedName) }
     var canBuild: Bool { !trimmedName.isEmpty && normalizedURL != nil && status != .building }
 
     var iconSource: IconSource {
-        if let customImage { return .image(customImage, style: imageStyle) }
+        if let customImage { return .image(customImage, zoom: CGFloat(imageZoom)) }
         return trimmedName.isEmpty ? .generated(name: "", symbol: "globe") : .generated(name: trimmedName)
     }
 
@@ -36,7 +41,7 @@ final class BuilderModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
-        panel.message = "Choose an image for the app icon. Square images 1024×1024 or larger look best."
+        panel.message = "Choose a square image for the app icon. 1024×1024 or larger looks best."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         loadImage(from: url)
     }
@@ -49,7 +54,7 @@ final class BuilderModel: ObservableObject {
         }
         customImage = image
         imageFileName = url.lastPathComponent
-        imageStyle = IconRenderer.hasTransparentEdges(image) ? .fit : .fill
+        imageZoom = Double(IconRenderer.automaticZoom(for: image))
         if case .failed = status { status = .idle }
         return true
     }
@@ -65,14 +70,16 @@ final class BuilderModel: ObservableObject {
         guard canBuild, let url = normalizedURL else { return }
         let name = trimmedName
 
-        let panel = NSSavePanel()
-        panel.title = "Create App"
-        panel.prompt = "Create"
-        panel.nameFieldStringValue = InputNormalizer.fileSafeName(name) + ".app"
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.allowedContentTypes = [.applicationBundle]
-        panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        let destination = self.destination
+
+        if FileManager.default.fileExists(atPath: destination.path) {
+            let alert = NSAlert()
+            alert.messageText = "Replace \(destination.lastPathComponent)?"
+            alert.informativeText = "An app already exists at \(destination.path). It will be moved to the Trash. Its sign-ins and settings are kept."
+            alert.addButton(withTitle: "Replace")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
 
         let spec = AppSpec(displayName: name, baseURL: url, icon: iconSource)
         status = .building
