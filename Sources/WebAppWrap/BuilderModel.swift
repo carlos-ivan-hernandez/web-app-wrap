@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
-import WebWrapKit
+import WebAppWrapKit
 
 @MainActor
 final class BuilderModel: ObservableObject {
@@ -50,7 +50,7 @@ final class BuilderModel: ObservableObject {
 
     static let applicationsFolder = URL(fileURLWithPath: "/Applications", isDirectory: true)
 
-    /// The name field may include folders: "WebWrap/Photos" -> /Applications/WebWrap/Photos.app.
+    /// The name field may include folders: "Web App Wrap/Photos" -> /Applications/Web App Wrap/Photos.app.
     var location: AppLocation { AppLocation(displayName) }
     var trimmedName: String { location.name }
     var destination: URL { location.bundleURL(in: Self.applicationsFolder) }

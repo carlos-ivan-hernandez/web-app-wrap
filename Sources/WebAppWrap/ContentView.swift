@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: BuilderModel
+    @Environment(\.openWindow) private var openWindow
     @State private var isDropTargeted = false
 
     var body: some View {
@@ -74,7 +75,7 @@ struct ContentView: View {
     private var fieldsColumn: some View {
         VStack(alignment: .leading, spacing: 16) {
             labeled("App name") {
-                TextField("e.g. Linear, or WebWrap/Linear", text: $model.displayName)
+                TextField("e.g. Linear, or Web App Wrap/Linear", text: $model.displayName)
                     .textFieldStyle(.roundedBorder)
                 if model.trimmedName.isEmpty {
                     caption("Shown in the Dock, menu bar and Finder. Add folders with “/”.")
@@ -131,6 +132,11 @@ struct ContentView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
+            Button { openWindow(id: HelpView.windowID) } label: {
+                Image(systemName: "questionmark.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("Web App Wrap Help (⌘?)")
             statusView
             Spacer()
             Button("Create from JSON…") { model.createAppsFromJSON() }

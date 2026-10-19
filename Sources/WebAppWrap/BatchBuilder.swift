@@ -1,5 +1,5 @@
 import AppKit
-import WebWrapKit
+import WebAppWrapKit
 
 /// Builds every app in a batch file, one at a time, carrying on past failures.
 enum BatchBuilder {

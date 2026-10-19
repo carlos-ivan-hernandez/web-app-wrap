@@ -11,7 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         withExtendedLifetime(delegate) { app.run() }
     }
 
-    private static let windowAutosaveName = "WebWrapBrowserWindow"
+    private static let windowAutosaveName = "WebAppWrapBrowserWindow"
     private static let pageZoomKey = "PageZoom"
 
     private(set) var config: WrapperConfig!
@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let config = WrapperConfig.load() else {
             let alert = NSAlert()
             alert.messageText = "This app has no web address configured."
-            alert.informativeText = "Recreate it with WebWrap, or pass --url <address> when running the runtime directly."
+            alert.informativeText = "Recreate it with Web App Wrap, or pass --url <address> when running the runtime directly."
             alert.runModal()
             NSApp.terminate(nil)
             return

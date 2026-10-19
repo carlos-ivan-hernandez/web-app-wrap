@@ -1,7 +1,7 @@
 import Foundation
 
-/// The app name field accepts a path: "WebWrap/Photos" names the app "Photos"
-/// and puts it in the "WebWrap" subfolder of Applications.
+/// The app name field accepts a path: "Web App Wrap/Photos" names the app "Photos"
+/// and puts it in the "Web App Wrap" subfolder of Applications.
 public struct AppLocation: Equatable {
     public let folders: [String]
     public let name: String

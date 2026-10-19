@@ -1,5 +1,5 @@
 import XCTest
-@testable import WebWrapKit
+@testable import WebAppWrapKit
 
 final class InputNormalizerTests: XCTestCase {
     func testAddsHTTPSWhenSchemeMissing() {
@@ -32,7 +32,7 @@ final class InputNormalizerTests: XCTestCase {
     }
 
     func testBundleIdentifier() {
-        XCTAssertEqual(InputNormalizer.bundleIdentifier(for: "Linear"), "com.webwrap.app.linear")
+        XCTAssertEqual(InputNormalizer.bundleIdentifier(for: "Linear"), "com.webappwrap.app.linear")
     }
 
     func testFileSafeName() {

@@ -25,7 +25,8 @@ enum MainMenu {
         let menu = NSMenu()
         menu.addItem(item("About \(appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), ""))
         menu.addItem(.separator())
-        menu.addItem(item("Hide \(appName)", #selector(NSApplication.hide(_:)), "h"))
+        // ⌘H is taken by Show Previous Tab, so Hide has no shortcut.
+        menu.addItem(item("Hide \(appName)", #selector(NSApplication.hide(_:)), ""))
         menu.addItem(item("Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]))
         menu.addItem(item("Show All", #selector(NSApplication.unhideAllApplications(_:)), ""))
         menu.addItem(.separator())
@@ -92,8 +93,10 @@ enum MainMenu {
         menu.addItem(item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"))
         menu.addItem(item("Zoom", #selector(NSWindow.performZoom(_:)), ""))
         menu.addItem(.separator())
-        menu.addItem(item("Show Next Tab", #selector(BrowserWindowController.showNextTab(_:)), "}"))
-        menu.addItem(item("Show Previous Tab", #selector(BrowserWindowController.showPreviousTab(_:)), "{"))
+        menu.addItem(item("Show Previous Tab", #selector(BrowserWindowController.showPreviousTab(_:)), "h"))
+        menu.addItem(item("Show Next Tab", #selector(BrowserWindowController.showNextTab(_:)), "l"))
+        menu.addItem(hidden(item("Previous Tab", #selector(BrowserWindowController.showPreviousTab(_:)), "{")))
+        menu.addItem(hidden(item("Next Tab", #selector(BrowserWindowController.showNextTab(_:)), "}")))
 
         // Browser-style alternates (ctrl+tab, ctrl+shift+tab) and cmd+1 ... cmd+9, without cluttering the menu.
         let backTab = String(UnicodeScalar(UInt8(NSBackTabCharacter)))

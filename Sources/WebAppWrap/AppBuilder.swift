@@ -1,6 +1,6 @@
 import AppKit
 import CoreServices
-import WebWrapKit
+import WebAppWrapKit
 
 struct AppSpec {
     var displayName: String
@@ -19,7 +19,7 @@ enum BuildError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .runtimeMissing:
-            "WebWrapRuntime is missing from this copy of WebWrap. Rebuild it with scripts/build.sh."
+            "WebAppWrapRuntime is missing from this copy of Web App Wrap. Rebuild it with scripts/build.sh."
         case .iconRenderingFailed:
             "The icon couldn’t be drawn."
         case let .commandFailed(command, output):
@@ -31,13 +31,13 @@ enum BuildError: LocalizedError {
 /// Assembles a wrapped app: the prebuilt runtime binary, an Info.plist naming the
 /// web address, and a generated icon, then ad-hoc signs it.
 enum AppBuilder {
-    /// The runtime ships inside WebWrap.app/Contents/Resources. When running from
-    /// `swift run`, it sits next to the WebWrap executable in the build folder.
+    /// The runtime ships inside Web App Wrap.app/Contents/Resources. When running from
+    /// `swift run`, it sits next to the WebAppWrap executable in the build folder.
     static func runtimeBinaryURL() -> URL? {
-        if let bundled = Bundle.main.url(forResource: "WebWrapRuntime", withExtension: nil) {
+        if let bundled = Bundle.main.url(forResource: "WebAppWrapRuntime", withExtension: nil) {
             return bundled
         }
-        let sibling = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("WebWrapRuntime")
+        let sibling = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("WebAppWrapRuntime")
         if let sibling, FileManager.default.isExecutableFile(atPath: sibling.path) {
             return sibling
         }
@@ -53,7 +53,7 @@ enum AppBuilder {
         let destination = destination.pathExtension == "app" ? destination : destination.appendingPathExtension("app")
         let executableName = InputNormalizer.fileSafeName(destination.deletingPathExtension().lastPathComponent)
 
-        let staging = fileManager.temporaryDirectory.appendingPathComponent("WebWrap-\(UUID().uuidString)")
+        let staging = fileManager.temporaryDirectory.appendingPathComponent("WebAppWrap-\(UUID().uuidString)")
         defer { try? fileManager.removeItem(at: staging) }
 
         let app = staging.appendingPathComponent(destination.lastPathComponent)

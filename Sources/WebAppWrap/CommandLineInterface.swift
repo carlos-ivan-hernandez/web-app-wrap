@@ -1,25 +1,25 @@
 import AppKit
-import WebWrapKit
+import WebAppWrapKit
 
 /// Scriptable entry points; see `usage`.
 enum CommandLineInterface {
     static let usage = """
     Usage:
-      WebWrap
+      WebAppWrap
           Open the app.
 
-      WebWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>]
+      WebAppWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>]
                     [--title-bar-color <#RRGGBB>] [--out <folder>]
-          Create one app. <name> may include folders, e.g. "WebWrap/Photos".
+          Create one app. <name> may include folders, e.g. "Web App Wrap/Photos".
           --zoom adds to the automatic zoom that crops off an image's border.
           The title bar color defaults to the site's theme color.
           --out is the folder apps go in (default /Applications).
 
-      WebWrap batch <file.json> [--out <folder>]
+      WebAppWrap batch <file.json> [--out <folder>]
           Create every app listed in a JSON array of objects with the fields
           name, url, image, zoom and titleBarColor (only name and url are required).
 
-      WebWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
+      WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
           Write just the icon.
     """
 
@@ -73,7 +73,7 @@ enum CommandLineInterface {
         guard let rawURL = value("--url", in: options), let url = InputNormalizer.normalizeURL(rawURL) else {
             throw UsageError(message: "--url is required and must be a web address.")
         }
-        // --name may include folders, e.g. "WebWrap/Photos".
+        // --name may include folders, e.g. "Web App Wrap/Photos".
         let location = AppLocation(name)
         guard !location.name.isEmpty else { throw UsageError(message: "--name needs an app name after any folders.") }
         let root = URL(fileURLWithPath: ((value("--out", in: options) ?? "/Applications") as NSString).expandingTildeInPath)

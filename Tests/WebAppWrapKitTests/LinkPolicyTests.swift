@@ -1,5 +1,5 @@
 import XCTest
-@testable import WebWrapKit
+@testable import WebAppWrapKit
 
 final class LinkPolicyTests: XCTestCase {
     private let policy = LinkPolicy(baseURL: URL(string: "https://app.example.com/home")!)

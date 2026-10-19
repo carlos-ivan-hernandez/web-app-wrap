@@ -1,6 +1,6 @@
 import AppKit
 @preconcurrency import WebKit
-import WebWrapKit
+import WebAppWrapKit
 
 /// One tab: a web view plus the policies for where its links go.
 /// The owning BrowserWindowController shows it and draws its entry in the tab strip.

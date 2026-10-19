@@ -1,5 +1,5 @@
 import Foundation
-import WebWrapKit
+import WebAppWrapKit
 
 /// Downloads a page and returns its theme color, checking the HTML first and then the
 /// web app manifest it links to (single-page apps often declare it only there).

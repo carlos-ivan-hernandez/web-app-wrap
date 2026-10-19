@@ -1,5 +1,5 @@
 import XCTest
-@testable import WebWrapKit
+@testable import WebAppWrapKit
 
 final class HexColorTests: XCTestCase {
     func testParsesLongAndShortForms() {

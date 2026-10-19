@@ -1,5 +1,5 @@
 import Foundation
-import WebWrapKit
+import WebAppWrapKit
 
 /// What this wrapped app points at, read from its Info.plist.
 struct WrapperConfig {
@@ -10,7 +10,7 @@ struct WrapperConfig {
     var policy: LinkPolicy { LinkPolicy(baseURL: baseURL) }
 
     /// `--url <address>` overrides the Info.plist value, which is handy when running
-    /// the bare runtime binary during development (`swift run WebWrapRuntime --url ...`).
+    /// the bare runtime binary during development (`swift run WebAppWrapRuntime --url ...`).
     static func load(bundle: Bundle = .main, arguments: [String] = CommandLine.arguments) -> WrapperConfig? {
         let info = bundle.infoDictionary ?? [:]
         var rawURL = info[WrapperInfoKeys.baseURL] as? String

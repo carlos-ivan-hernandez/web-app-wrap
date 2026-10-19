@@ -49,7 +49,7 @@ public enum InputNormalizer {
     /// Stable bundle identifier for a wrapped app. Cookies and local storage are
     /// keyed by this, so regenerating an app with the same name keeps its sessions.
     public static func bundleIdentifier(for name: String) -> String {
-        "com.webwrap.app." + slug(name)
+        "com.webappwrap.app." + slug(name)
     }
 
     /// A display name that is safe to use as a file name (no "/" or ":").

@@ -1,6 +1,6 @@
 import AppKit
 import WebKit
-import WebWrapKit
+import WebAppWrapKit
 
 /// A window holding any number of tabs. The title bar is hidden and replaced by a
 /// TabStripView, with the traffic-light buttons moved down to sit inline with the tabs.
@@ -28,6 +28,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         )
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
+        // macOS otherwise treats the whole top of the window as a drag handle, which swallows
+        // tab drags. TabStripView moves the window itself when its background is dragged.
+        window.isMovable = false
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
         window.isRestorable = false
@@ -67,6 +70,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             self.closeTab(self.tabs[index])
         }
         tabStrip.onNewTab = { [weak self] in self?.newTab(nil) }
+        tabStrip.onMove = { [weak self] from, to in self?.moveTab(from: from, to: to) }
         // AppKit re-lays out the title bar on resize, focus and appearance changes; put the buttons back each time.
         tabStrip.onLayout = { [weak self] in self?.layoutTrafficLights() }
     }
@@ -133,6 +137,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
     }
 
+    /// Reorders after a tab is dragged in the strip.
+    func moveTab(from source: Int, to destination: Int) {
+        guard tabs.indices.contains(source), tabs.indices.contains(destination), source != destination else { return }
+        let tab = tabs.remove(at: source)
+        tabs.insert(tab, at: destination)
+        refreshStrip()
+    }
+
     func tabDidChange(_ tab: Tab) {
         if tab === selectedTab {
             window?.title = tab.displayTitle
@@ -155,6 +167,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     // MARK: - Traffic lights
 
     /// Moves the close/minimize/zoom buttons so they're vertically centered in the tab strip.
+    /// The title bar container is shrunk to just the buttons' corner so the rest of the bar's
+    /// clicks reach the tab strip.
     private func layoutTrafficLights() {
         guard let window, !window.styleMask.contains(.fullScreen),
               let close = window.standardWindowButton(.closeButton),
@@ -165,7 +179,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         else { return }
 
         let height = Self.stripHeight
-        let containerFrame = NSRect(x: 0, y: window.frame.height - height, width: window.frame.width, height: height)
+        let containerFrame = NSRect(
+            x: 0, y: window.frame.height - height,
+            width: Self.stripInsetForTrafficLights, height: height
+        )
         if titlebarContainer.frame != containerFrame {
             titlebarContainer.frame = containerFrame
             titlebar.frame = titlebarContainer.bounds

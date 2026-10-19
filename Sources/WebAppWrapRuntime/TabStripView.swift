@@ -1,7 +1,7 @@
 import AppKit
-import WebWrapKit
+import WebAppWrapKit
 
-/// Colors for the tab bar, from the title bar color chosen in WebWrap.
+/// Colors for the tab bar, from the title bar color chosen in Web App Wrap.
 struct StripPalette {
     var background: NSColor
     var foreground: NSColor
@@ -20,7 +20,7 @@ struct StripPalette {
 /// The bar at the top of the window: room for the traffic lights, then the tabs and a "+".
 /// With a single tab it's just a plain title bar. With more, tabs up to 240pt wide (shrinking
 /// to fit when there are many) sit side by side between thin dividers. Empty space drags the
-/// window and double-click zooms it.
+/// window and double-click zooms it. Tabs can be dragged sideways to reorder them.
 final class TabStripView: NSView {
     struct Item {
         var title: String
@@ -31,6 +31,8 @@ final class TabStripView: NSView {
     var onClose: ((Int) -> Void)?
     var onNewTab: (() -> Void)?
     var onLayout: (() -> Void)?
+    /// A tab was dragged from one index to another.
+    var onMove: ((_ from: Int, _ to: Int) -> Void)?
 
     /// Space reserved on the left for the traffic lights.
     var leadingInset: CGFloat = 80 { didSet { needsLayout = true } }
@@ -42,6 +44,8 @@ final class TabStripView: NSView {
     private var tabViews: [TabItemView] = []
     private let newTabButton = NSButton()
     private var showsTabs: Bool { tabViews.count > 1 }
+    /// The tab under the mouse during a drag; layout leaves it where the mouse put it.
+    private var draggedView: TabItemView?
 
     private static let maxTabWidth: CGFloat = 240
     private static let minTabWidth: CGFloat = 72
@@ -96,17 +100,11 @@ final class TabStripView: NSView {
 
     override func layout() {
         super.layout()
-        let available = bounds.width - leadingInset - Self.newTabButtonWidth - Self.trailingPadding
-        let fitted = available / CGFloat(max(tabViews.count, 1))
-        let width = min(Self.maxTabWidth, max(Self.minTabWidth, fitted))
-
-        for (index, view) in tabViews.enumerated() {
-            let minX = (leadingInset + CGFloat(index) * width).rounded()
-            let maxX = (leadingInset + CGFloat(index + 1) * width).rounded()
-            view.frame = NSRect(x: minX, y: 0, width: maxX - minX, height: bounds.height)
+        for (index, view) in tabViews.enumerated() where view !== draggedView {
+            view.frame = tabFrame(at: index)
         }
         // Right after the last tab, but never pushed off the edge when tabs are at minimum width.
-        let afterTabs = (leadingInset + CGFloat(tabViews.count) * width).rounded()
+        let afterTabs = (leadingInset + CGFloat(tabViews.count) * tabWidth).rounded()
         newTabButton.frame = NSRect(
             x: min(afterTabs, bounds.width - Self.newTabButtonWidth - Self.trailingPadding), y: 0,
             width: Self.newTabButtonWidth, height: bounds.height
@@ -114,16 +112,89 @@ final class TabStripView: NSView {
         onLayout?()
     }
 
+    private var tabWidth: CGFloat {
+        let available = bounds.width - leadingInset - Self.newTabButtonWidth - Self.trailingPadding
+        let fitted = available / CGFloat(max(tabViews.count, 1))
+        return min(Self.maxTabWidth, max(Self.minTabWidth, fitted))
+    }
+
+    private func tabFrame(at index: Int) -> NSRect {
+        let minX = (leadingInset + CGFloat(index) * tabWidth).rounded()
+        let maxX = (leadingInset + CGFloat(index + 1) * tabWidth).rounded()
+        return NSRect(x: minX, y: 0, width: maxX - minX, height: bounds.height)
+    }
+
+    // MARK: - Selecting and dragging tabs
+
+    /// Handles a press on a tab: selects it, and if the mouse then moves sideways, drags the tab
+    /// along the bar, sliding the others out of the way, until the button is released.
+    fileprivate func trackPress(on view: TabItemView, with event: NSEvent) {
+        guard let startIndex = tabViews.firstIndex(where: { $0 === view }) else { return }
+        onSelect?(startIndex)
+        guard showsTabs, let window else { return }
+
+        let startX = convert(event.locationInWindow, from: nil).x
+        let grabOffset = startX - view.frame.minX
+        var currentIndex = startIndex
+        var isDragging = false
+
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]), next.type == .leftMouseDragged {
+            let x = convert(next.locationInWindow, from: nil).x
+            if !isDragging {
+                guard abs(x - startX) > 4 else { continue }
+                isDragging = true
+                draggedView = view
+                addSubview(view, positioned: .above, relativeTo: nil)
+            }
+
+            // Follow the mouse, kept within the row of tabs.
+            let lastSlot = tabFrame(at: tabViews.count - 1).minX
+            view.setFrameOrigin(NSPoint(x: min(max(x - grabOffset, leadingInset), lastSlot), y: 0))
+
+            // The slot under the dragged tab's center is where it would land.
+            let slot = Int(((view.frame.midX - leadingInset) / tabWidth).rounded(.down))
+            let target = min(max(slot, 0), tabViews.count - 1)
+            if target != currentIndex {
+                tabViews.remove(at: currentIndex)
+                tabViews.insert(view, at: target)
+                currentIndex = target
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.15
+                    for (index, other) in tabViews.enumerated() where other !== view {
+                        other.animator().frame = tabFrame(at: index)
+                    }
+                }
+            }
+            needsDisplay = true
+        }
+
+        guard isDragging else { return }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            view.animator().frame = tabFrame(at: currentIndex)
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                self?.draggedView = nil
+                self?.needsLayout = true
+                self?.needsDisplay = true
+            }
+        })
+        if currentIndex != startIndex {
+            onMove?(startIndex, currentIndex)
+        }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         palette.background.setFill()
         dirtyRect.fill()
 
         // Thin dividers on both sides of every tab, as in terminal-style tab bars.
+        // Drawn at the resting slots, so they stay put while a tab is dragged across them.
         guard showsTabs else { return }
         palette.foreground.withAlphaComponent(0.12).setFill()
         let lineWidth = 1 / (window?.backingScaleFactor ?? 2)
-        var edges = tabViews.map(\.frame.minX)
-        if let last = tabViews.last { edges.append(last.frame.maxX) }
+        var edges = tabViews.indices.map { tabFrame(at: $0).minX }
+        if !tabViews.isEmpty { edges.append(tabFrame(at: tabViews.count - 1).maxX) }
         for x in edges {
             NSRect(x: x - lineWidth / 2, y: 0, width: lineWidth, height: bounds.height).fill()
         }
@@ -146,7 +217,25 @@ final class TabStripView: NSView {
             default: window?.performZoom(nil)
             }
         } else {
-            window?.performDrag(with: event)
+            dragWindow()
+        }
+    }
+
+    /// Moves the window with the mouse until the button is released. Done by hand because the
+    /// window is not movable (see BrowserWindowController), which keeps tabs from dragging it.
+    private func dragWindow() {
+        guard let window else { return }
+        let startMouse = NSEvent.mouseLocation
+        let startOrigin = window.frame.origin
+
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]), next.type == .leftMouseDragged {
+            let mouse = NSEvent.mouseLocation
+            var origin = NSPoint(x: startOrigin.x + mouse.x - startMouse.x, y: startOrigin.y + mouse.y - startMouse.y)
+            // Like a normal window, don't let the bar slide up under the menu bar.
+            if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? window.screen {
+                origin.y = min(origin.y, screen.visibleFrame.maxY - window.frame.height)
+            }
+            window.setFrameOrigin(origin)
         }
     }
 }
@@ -235,6 +324,9 @@ private final class TabItemView: NSView {
 
     override var mouseDownCanMoveWindow: Bool { false }
 
+    /// Lets a tab be clicked or dragged even while the window is in the background.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
@@ -249,7 +341,11 @@ private final class TabItemView: NSView {
     override func mouseExited(with event: NSEvent) { isHovered = false }
 
     override func mouseDown(with event: NSEvent) {
-        onSelect?()
+        guard let strip = superview as? TabStripView else {
+            onSelect?()
+            return
+        }
+        strip.trackPress(on: self, with: event)
     }
 
     /// Middle-click closes, as in browsers.

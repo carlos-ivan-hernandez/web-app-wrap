@@ -1,5 +1,5 @@
 import XCTest
-@testable import WebWrapKit
+@testable import WebAppWrapKit
 
 final class BatchFileTests: XCTestCase {
     private let base = URL(fileURLWithPath: "/Users/me/apps")
@@ -19,12 +19,12 @@ final class BatchFileTests: XCTestCase {
 
     func testFullEntry() throws {
         let entries = try parse(##"""
-        [{"name": "WebWrap/Photos", "url": "kphotos.vercel.app", "image": "icons/photos.png",
+        [{"name": "Web App Wrap/Photos", "url": "kphotos.vercel.app", "image": "icons/photos.png",
           "zoom": 1.5, "titleBarColor": "#1a1a1a"}]
         """##)
         XCTAssertEqual(entries.count, 1)
         let entry = entries[0]
-        XCTAssertEqual(entry.location, AppLocation("WebWrap/Photos"))
+        XCTAssertEqual(entry.location, AppLocation("Web App Wrap/Photos"))
         XCTAssertEqual(entry.url.absoluteString, "https://kphotos.vercel.app")
         XCTAssertEqual(entry.image?.path, "/Users/me/apps/icons/photos.png")
         XCTAssertEqual(entry.zoom, 1.5)

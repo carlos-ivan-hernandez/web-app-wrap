@@ -1,5 +1,5 @@
 import XCTest
-@testable import WebWrapKit
+@testable import WebAppWrapKit
 
 final class AppLocationTests: XCTestCase {
     private let root = URL(fileURLWithPath: "/Applications")
@@ -12,10 +12,10 @@ final class AppLocationTests: XCTestCase {
     }
 
     func testSubfolder() {
-        let location = AppLocation("WebWrap/Photos")
+        let location = AppLocation("Web App Wrap/Photos")
         XCTAssertEqual(location.name, "Photos")
-        XCTAssertEqual(location.folders, ["WebWrap"])
-        XCTAssertEqual(location.bundleURL(in: root).path, "/Applications/WebWrap/Photos.app")
+        XCTAssertEqual(location.folders, ["Web App Wrap"])
+        XCTAssertEqual(location.bundleURL(in: root).path, "/Applications/Web App Wrap/Photos.app")
     }
 
     func testIgnoresEmptyAndRelativeParts() {
@@ -25,7 +25,7 @@ final class AppLocationTests: XCTestCase {
     }
 
     func testTrailingSlashHasNoName() {
-        XCTAssertEqual(AppLocation("WebWrap/").name, "WebWrap")
+        XCTAssertEqual(AppLocation("Web App Wrap/").name, "Web App Wrap")
         XCTAssertEqual(AppLocation("   ").name, "")
     }
 }

@@ -68,7 +68,7 @@ enum IconRenderer {
         }
 
         let fileManager = FileManager.default
-        let workDir = fileManager.temporaryDirectory.appendingPathComponent("WebWrapIcon-\(UUID().uuidString)")
+        let workDir = fileManager.temporaryDirectory.appendingPathComponent("WebAppWrapIcon-\(UUID().uuidString)")
         let iconset = workDir.appendingPathComponent("AppIcon.iconset")
         try fileManager.createDirectory(at: iconset, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: workDir) }

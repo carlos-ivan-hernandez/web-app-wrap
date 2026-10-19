@@ -1,10 +1,10 @@
 import Foundation
 
-/// One app in a batch file. The fields mirror the WebWrap window:
+/// One app in a batch file. The fields mirror the Web App Wrap window:
 ///
 ///     [
 ///       {
-///         "name": "WebWrap/Photos",
+///         "name": "Web App Wrap/Photos",
 ///         "url": "https://kphotos.vercel.app",
 ///         "image": "icons/photos.png",
 ///         "zoom": 1.2,
