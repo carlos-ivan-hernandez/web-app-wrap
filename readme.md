@@ -99,9 +99,9 @@ UNIVERSAL=1 ./scripts/build.sh  # Apple silicon + Intel (needs full Xcode)
 
 You can recreate an app under the same name, for example to change its icon or
 URL. It keeps its sign-ins, because the app's data is tied to its bundle ID
-(`com.webappwrap.app.<name>`).
+(`com.waw.app.<name>`).
 
-Choose **Help → Web App Wrap Help** (⌘?), or click the **?** in the window, for
+Choose **Help → Web App Wrap Help**, or click the **?** in the window, for
 a guide to the app and the full command-line reference.
 
 ### Many apps at once (JSON)

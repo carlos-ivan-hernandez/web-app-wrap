@@ -3,7 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var model: BuilderModel
     @Environment(\.openWindow) private var openWindow
-    @State private var isDropTargeted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -27,15 +26,8 @@ struct ContentView: View {
                 .interpolation(.high)
                 .frame(width: 148, height: 148)
                 .padding(8)
-                .background {
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                        .foregroundStyle(isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.35))
-                }
                 .dropDestination(for: URL.self) { urls, _ in
                     model.loadImage(from: urls.first)
-                } isTargeted: {
-                    isDropTargeted = $0
                 }
                 .help("Drop an image here")
 
@@ -136,7 +128,7 @@ struct ContentView: View {
                 Image(systemName: "questionmark.circle")
             }
             .buttonStyle(.borderless)
-            .help("Web App Wrap Help (⌘?)")
+            .help("Web App Wrap Help")
             statusView
             Spacer()
             Button("Create from JSON…") { model.createAppsFromJSON() }

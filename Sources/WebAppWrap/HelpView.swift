@@ -8,7 +8,7 @@ struct HelpView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 40) {
                 header
                 overview
                 twoWays
@@ -17,8 +17,10 @@ struct HelpView: View {
                 generatedApps
                 footer
             }
-            .padding(28)
-            .frame(maxWidth: 680, alignment: .leading)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 36)
+            // Fill the window's width so the text rewraps as the window is resized.
+            .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
         }
         .frame(minWidth: 520, minHeight: 420)
@@ -150,7 +152,7 @@ struct HelpView: View {
     }
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 14) {
             Divider()
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right").foregroundStyle(.secondary)
@@ -175,7 +177,7 @@ struct HelpView: View {
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             Text(title).font(.title2.weight(.semibold))
             content()
         }
@@ -183,15 +185,18 @@ struct HelpView: View {
 
     private func paragraph(_ markdown: String) -> some View {
         Text(LocalizedStringKey(markdown))
+            .lineSpacing(4)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private func bullets(_ items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(items, id: \.self) { item in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text("•").foregroundStyle(.secondary)
-                    Text(LocalizedStringKey(item)).fixedSize(horizontal: false, vertical: true)
+                    Text(LocalizedStringKey(item))
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -200,7 +205,9 @@ struct HelpView: View {
     private func code(_ text: String) -> some View {
         Text(text)
             .font(.system(.callout, design: .monospaced))
-            .padding(10)
+            .lineSpacing(3)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
             .fixedSize(horizontal: false, vertical: true)
@@ -213,22 +220,25 @@ struct HelpView: View {
         options: [Option],
         example: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(name).font(.headline.monospaced())
+        VStack(alignment: .leading, spacing: 14) {
+            Text(name).font(.title3.monospaced().weight(.semibold))
             paragraph(summary)
             code(usage)
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 6) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 12) {
                 ForEach(options) { option in
                     GridRow {
                         Text(option.flag).font(.system(.callout, design: .monospaced))
-                        Text(option.meaning).font(.callout).fixedSize(horizontal: false, vertical: true)
+                        Text(option.meaning)
+                            .font(.callout)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
             Text("Example").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
             code(example)
         }
-        .padding(.top, 6)
+        .padding(.top, 10)
     }
 }
 
@@ -238,7 +248,6 @@ struct HelpMenuItem: View {
 
     var body: some View {
         Button("Web App Wrap Help") { openWindow(id: HelpView.windowID) }
-            .keyboardShortcut("?", modifiers: .command)
         Divider()
         Link("Web App Wrap on GitHub", destination: HelpView.repositoryURL)
     }

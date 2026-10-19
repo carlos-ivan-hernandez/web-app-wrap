@@ -32,7 +32,7 @@ final class InputNormalizerTests: XCTestCase {
     }
 
     func testBundleIdentifier() {
-        XCTAssertEqual(InputNormalizer.bundleIdentifier(for: "Linear"), "com.webappwrap.app.linear")
+        XCTAssertEqual(InputNormalizer.bundleIdentifier(for: "Linear"), "com.waw.app.linear")
     }
 
     func testFileSafeName() {
