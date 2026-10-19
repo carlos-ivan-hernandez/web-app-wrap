@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import WebWrapKit
 
 /// A window holding any number of tabs. The title bar is hidden and replaced by a
 /// TabStripView, with the traffic-light buttons moved down to sit inline with the tabs.
@@ -54,6 +55,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         ])
 
         tabStrip.leadingInset = Self.stripInsetForTrafficLights
+        let palette = StripPalette(color: appDelegate.config.titleBarColor)
+        tabStrip.palette = palette
+        window.backgroundColor = palette.background
         tabStrip.onSelect = { [weak self] index in
             guard let self, self.tabs.indices.contains(index) else { return }
             self.select(self.tabs[index])
@@ -132,9 +136,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func tabDidChange(_ tab: Tab) {
         if tab === selectedTab {
             window?.title = tab.displayTitle
-            let palette = StripPalette(pageColor: tab.pageColor)
-            tabStrip.palette = palette
-            window?.backgroundColor = palette.background
         }
         refreshStrip()
     }
@@ -189,6 +190,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowDidExitFullScreen(_ notification: Notification) {
         tabStrip.leadingInset = Self.stripInsetForTrafficLights
+        let palette = StripPalette(color: appDelegate.config.titleBarColor)
+        tabStrip.palette = palette
+        window.backgroundColor = palette.background
         layoutTrafficLights()
     }
 

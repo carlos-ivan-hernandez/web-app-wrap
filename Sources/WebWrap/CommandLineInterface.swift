@@ -8,8 +8,9 @@ enum CommandLineInterface {
     static let usage = """
     Usage:
       WebWrap                      Open the app.
-      WebWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>] [--out <folder>]
-                                   (zoom defaults to just enough to crop off a solid or transparent border)
+      WebWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>] [--title-bar-color <#RRGGBB>]
+                                   (title bar color defaults to the site's theme color) [--out <folder>]
+                                   (--zoom adds to the automatic zoom that crops off a solid or transparent border)
       WebWrap icon  --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
     """
 
@@ -49,8 +50,9 @@ enum CommandLineInterface {
         guard let image = NSImage(contentsOf: url) else {
             throw UsageError(message: "Couldn’t read an image from \(imagePath).")
         }
-        let zoom = value("--zoom", in: options).flatMap(Double.init).map { CGFloat($0) }
-            ?? IconRenderer.automaticZoom(for: image)
+        // --zoom is on top of the automatic zoom that crops off any border.
+        let extra = value("--zoom", in: options).flatMap(Double.init).map { CGFloat($0) } ?? 1
+        let zoom = IconRenderer.automaticZoom(for: image) * min(max(extra, IconSource.userZoomRange.lowerBound), IconSource.userZoomRange.upperBound)
         return .image(image, zoom: zoom)
     }
 
@@ -65,9 +67,35 @@ enum CommandLineInterface {
         let location = AppLocation(name)
         guard !location.name.isEmpty else { throw UsageError(message: "--name needs an app name after any folders.") }
         let root = URL(fileURLWithPath: ((value("--out", in: options) ?? "/Applications") as NSString).expandingTildeInPath)
-        let spec = AppSpec(displayName: location.name, baseURL: url, icon: try iconSource(name: location.name, options: options))
+        let titleBarColor: HexColor
+        if let raw = value("--title-bar-color", in: options) {
+            guard let parsed = HexColor(hex: raw) else { throw UsageError(message: "--title-bar-color must look like #1E1E1E.") }
+            titleBarColor = parsed
+        } else {
+            // Like the app: default to the site's theme color.
+            titleBarColor = fetchThemeColor(from: url) ?? .defaultTitleBar
+        }
+        let spec = AppSpec(
+            displayName: location.name,
+            baseURL: url,
+            icon: try iconSource(name: location.name, options: options),
+            titleBarColor: titleBarColor
+        )
         let app = try AppBuilder.build(spec, to: location.bundleURL(in: root))
         print(app.path)
+    }
+
+    /// Blocks until the site's theme color is fetched; fine for a one-shot command.
+    private static func fetchThemeColor(from url: URL) -> HexColor? {
+        final class Box: @unchecked Sendable { var color: HexColor? }
+        let box = Box()
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            box.color = await ThemeColorFetcher.fetch(from: url)
+            done.signal()
+        }
+        done.wait()
+        return box.color
     }
 
     private static func icon(_ options: [String]) throws {

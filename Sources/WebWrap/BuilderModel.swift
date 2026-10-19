@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 import WebWrapKit
 
@@ -12,8 +13,27 @@ final class BuilderModel: ObservableObject {
     }
 
     @Published var displayName = ""
-    @Published var urlString = ""
+    @Published var urlString = "" {
+        didSet { if urlString != oldValue { lookUpThemeColor() } }
+    }
+
+    enum TitleBarColorSource: Equatable {
+        /// No site color known (no address yet, or the site doesn't declare one).
+        case standard
+        /// Fetching the site to find its theme color.
+        case lookingUp
+        /// Taken from the site's theme color.
+        case site
+        /// Picked by the user; site lookups no longer change it.
+        case custom
+    }
+
+    @Published private(set) var titleBarColor = Color(nsColor: BuilderModel.nsColor(.defaultTitleBar))
+    @Published private(set) var titleBarColorSource = TitleBarColorSource.standard
+    private var themeColorLookup: Task<Void, Never>?
+    /// The user's zoom, on top of `baseZoom`. 1 = just enough to crop off the image's border.
     @Published var imageZoom: Double = 1
+    @Published private(set) var baseZoom: CGFloat = 1
     @Published private(set) var customImage: NSImage?
     @Published private(set) var imageFileName = ""
     @Published private(set) var status: Status = .idle
@@ -29,7 +49,7 @@ final class BuilderModel: ObservableObject {
     var canBuild: Bool { !trimmedName.isEmpty && normalizedURL != nil && status != .building }
 
     var iconSource: IconSource {
-        if let customImage { return .image(customImage, zoom: CGFloat(imageZoom)) }
+        if let customImage { return .image(customImage, zoom: baseZoom * CGFloat(imageZoom)) }
         return trimmedName.isEmpty ? .generated(name: "", symbol: "globe") : .generated(name: trimmedName)
     }
 
@@ -54,7 +74,8 @@ final class BuilderModel: ObservableObject {
         }
         customImage = image
         imageFileName = url.lastPathComponent
-        imageZoom = Double(IconRenderer.automaticZoom(for: image))
+        baseZoom = IconRenderer.automaticZoom(for: image)
+        imageZoom = 1
         if case .failed = status { status = .idle }
         return true
     }
@@ -81,7 +102,7 @@ final class BuilderModel: ObservableObject {
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
 
-        let spec = AppSpec(displayName: name, baseURL: url, icon: iconSource)
+        let spec = AppSpec(displayName: name, baseURL: url, icon: iconSource, titleBarColor: titleBarHex)
         status = .building
         Task {
             let result = await Task.detached(priority: .userInitiated) {
@@ -92,6 +113,45 @@ final class BuilderModel: ObservableObject {
             case let .failure(error): status = .failed(error.localizedDescription)
             }
         }
+    }
+
+    // MARK: - Title bar color
+
+    func setTitleBarColor(_ color: Color) {
+        themeColorLookup?.cancel()
+        titleBarColor = color
+        titleBarColorSource = .custom
+    }
+
+    /// Drops a custom pick and goes back to following the site's theme color.
+    func useSiteThemeColor() {
+        titleBarColorSource = .standard
+        lookUpThemeColor()
+    }
+
+    /// Fetches the site's theme color shortly after the address stops changing.
+    private func lookUpThemeColor() {
+        themeColorLookup?.cancel()
+        guard titleBarColorSource != .custom, let url = normalizedURL else { return }
+        titleBarColorSource = .lookingUp
+        themeColorLookup = Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard !Task.isCancelled else { return }
+            let found = await ThemeColorFetcher.fetch(from: url)
+            guard !Task.isCancelled, titleBarColorSource != .custom else { return }
+            titleBarColor = Color(nsColor: Self.nsColor(found ?? .defaultTitleBar))
+            titleBarColorSource = found == nil ? .standard : .site
+        }
+    }
+
+    /// The picked title bar color as sRGB hex (the picker can hand back other color spaces).
+    var titleBarHex: HexColor {
+        guard let rgb = NSColor(titleBarColor).usingColorSpace(.sRGB) else { return .defaultTitleBar }
+        return HexColor(red: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent)
+    }
+
+    static func nsColor(_ hex: HexColor) -> NSColor {
+        NSColor(srgbRed: hex.red, green: hex.green, blue: hex.blue, alpha: 1)
     }
 
     func open(_ app: URL) {

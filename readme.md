@@ -9,14 +9,15 @@ cookies and storage.
 
 ## Tabs in generated apps
 
-The tabs sit in the title bar, in line with the close, minimize and zoom
-buttons, so there's no separate title-bar row. The tab strip takes its color from
-the page (its `theme-color`, or else its background color), so it blends into
-the web app.
+The window has a single bar at the top, in the title-bar color you pick in
+WebWrap, with the close, minimize and zoom buttons on the left. With one tab
+open, that's all it shows. With two or more, the tabs share the bar's full width.
+They're separated by thin dividers, and every tab uses the bar's color. The
+selected tab is marked by brighter text and its close button.
 
 | Action | Result |
 | --- | --- |
-| ⌘T, or the `+` after the tabs | New tab at the base URL |
+| ⌘T, or the `+` at the right end of the tab bar | New tab at the base URL |
 | ⌘-click a link | Opens in a new background tab |
 | ⇧⌘-click a link | Opens in a new tab and switches to it |
 | ⌘W, or the tab's × (middle-click also works) | Closes the tab. Closing the last tab quits the app |
@@ -79,9 +80,16 @@ UNIVERSAL=1 ./scripts/build.sh  # Apple silicon + Intel (needs full Xcode)
    the macOS icon shape and adds the standard margin and shadow. If you want to
    crop in, drag the zoom slider under the preview. If the image has a solid-color
    or transparent border, for example an icon that's already rounded on a white
-   square, the slider starts zoomed in just far enough to crop the border out. Without an image, WebWrap
+   square, WebWrap zooms in just far enough to crop the border out. That zoom is the
+   starting point, and the slider only zooms in further from there. Without an image, WebWrap
    draws a colored tile with the app name's first letter.
-4. Click **Create App**. WebWrap saves the app in `/Applications`. If an app with
+4. Check the **Title bar color**. It's the background of the bar holding the
+   window buttons and tabs. After you enter the web address, WebWrap fills it in
+   with the site's theme color, from its `<meta name="theme-color">` tag or its
+   web app manifest. You can pick a different color, and **Use Site Color**
+   switches back. If the site has no theme color, WebWrap uses `#1E1E1E`. The text
+   switches between light and dark to stay readable.
+5. Click **Create App**. WebWrap saves the app in `/Applications`. If an app with
    that name is already there, WebWrap asks before replacing it and moves the old
    copy to the Trash.
 
@@ -94,7 +102,7 @@ URL. It keeps its sign-ins, because the app's data is tied to its bundle ID
 ```bash
 WebWrap=/Applications/WebWrap.app/Contents/MacOS/WebWrap
 $WebWrap build --name "WebWrap/Linear" --url linear.app
-$WebWrap build --name "Grafana" --url localhost:3000 --image ~/grafana.png --zoom 1.2 --out ~/Applications
+$WebWrap build --name "Grafana" --url localhost:3000 --image ~/grafana.png --zoom 1.2 --title-bar-color "#1a1a1a" --out ~/Applications
 $WebWrap icon --name "Linear" --out Linear.icns   # just the icon
 ```
 

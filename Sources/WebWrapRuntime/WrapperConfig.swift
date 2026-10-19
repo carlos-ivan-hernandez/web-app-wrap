@@ -5,6 +5,7 @@ import WebWrapKit
 struct WrapperConfig {
     let appName: String
     let baseURL: URL
+    let titleBarColor: HexColor
 
     var policy: LinkPolicy { LinkPolicy(baseURL: baseURL) }
 
@@ -22,6 +23,8 @@ struct WrapperConfig {
             ?? (info["CFBundleName"] as? String)
             ?? url.host
             ?? ProcessInfo.processInfo.processName
-        return WrapperConfig(appName: name, baseURL: url)
+        // Apps made before the color setting existed get the default.
+        let color = (info[WrapperInfoKeys.titleBarColor] as? String).flatMap(HexColor.init(hex:)) ?? .defaultTitleBar
+        return WrapperConfig(appName: name, baseURL: url, titleBarColor: color)
     }
 }

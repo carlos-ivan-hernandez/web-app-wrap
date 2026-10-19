@@ -51,7 +51,7 @@ struct ContentView: View {
                     Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
                     Slider(
                         value: $model.imageZoom,
-                        in: Double(IconSource.zoomRange.lowerBound)...Double(IconSource.zoomRange.upperBound)
+                        in: Double(IconSource.userZoomRange.lowerBound)...Double(IconSource.userZoomRange.upperBound)
                     )
                     .controlSize(.small)
                     Image(systemName: "plus.magnifyingglass").foregroundStyle(.secondary)
@@ -94,6 +94,34 @@ struct ContentView: View {
                 } else {
                     caption("Enter a web address like example.com or https://example.com/app.", color: .red)
                 }
+            }
+
+            labeled("Title bar color") {
+                HStack(spacing: 8) {
+                    ColorPicker(
+                        "Title bar color",
+                        selection: Binding(get: { model.titleBarColor }, set: { model.setTitleBarColor($0) }),
+                        supportsOpacity: false
+                    )
+                    .labelsHidden()
+                    caption(model.titleBarHex.hexString)
+                        .textSelection(.enabled)
+                    switch model.titleBarColorSource {
+                    case .lookingUp:
+                        ProgressView().controlSize(.small)
+                        caption("Checking the site’s theme color…")
+                    case .site:
+                        caption("From the site’s theme color")
+                    case .standard:
+                        caption(model.normalizedURL == nil ? "Default" : "Default (the site has no theme color)")
+                    case .custom:
+                        caption("Custom")
+                        Button("Use Site Color") { model.useSiteThemeColor() }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                    }
+                }
+                caption("Background of the bar holding the window buttons and tabs.")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

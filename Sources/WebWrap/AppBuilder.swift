@@ -6,6 +6,7 @@ struct AppSpec {
     var displayName: String
     var baseURL: URL
     var icon: IconSource
+    var titleBarColor: HexColor = .defaultTitleBar
 
     var bundleIdentifier: String { InputNormalizer.bundleIdentifier(for: displayName) }
 }
@@ -113,6 +114,7 @@ enum AppBuilder {
             "NSLocalNetworkUsageDescription": "\(name) connects to servers on your local network when the web app uses them.",
             "NSAppTransportSecurity": ["NSAllowsArbitraryLoadsInWebContent": true],
             WrapperInfoKeys.baseURL: spec.baseURL.absoluteString,
+            WrapperInfoKeys.titleBarColor: spec.titleBarColor.hexString,
         ]
     }
 }

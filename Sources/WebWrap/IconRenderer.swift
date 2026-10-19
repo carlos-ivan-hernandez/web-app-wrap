@@ -8,7 +8,10 @@ enum IconSource {
     /// further, keeping the image centered.
     case image(NSImage, zoom: CGFloat = 1)
 
-    static let zoomRange: ClosedRange<CGFloat> = 1...3
+    /// How far the user can zoom in, on top of the automatic zoom that crops off a border.
+    static let userZoomRange: ClosedRange<CGFloat> = 1...3
+    /// The furthest the automatic zoom will go looking for the edge of the artwork.
+    static let maximumAutomaticZoom: CGFloat = 3
 }
 
 /// Draws icons on Apple's macOS grid: an 824pt rounded square centered on a 1024pt canvas.
@@ -133,8 +136,11 @@ enum IconRenderer {
             let offset = y * bytesPerRow + x * 4
             return (Int(pixels[offset]), Int(pixels[offset + 1]), Int(pixels[offset + 2]), Int(pixels[offset + 3]))
         }
+        func distance(_ p: (r: Int, g: Int, b: Int, a: Int), _ q: (r: Int, g: Int, b: Int, a: Int)) -> Int {
+            max(abs(p.r - q.r), abs(p.g - q.g), abs(p.b - q.b), abs(p.a - q.a))
+        }
         func similar(_ p: (r: Int, g: Int, b: Int, a: Int), _ q: (r: Int, g: Int, b: Int, a: Int)) -> Bool {
-            max(abs(p.r - q.r), abs(p.g - q.g), abs(p.b - q.b), abs(p.a - q.a)) <= 24
+            distance(p, q) <= 24
         }
 
         let corners = [rgba(0, 0), rgba(width - 1, 0), rgba(0, height - 1), rgba(width - 1, height - 1)]
@@ -142,20 +148,25 @@ enum IconRenderer {
         let cornerIsTransparent = corners.allSatisfy { $0.a < 128 }
         guard cornerIsTransparent || corners.allSatisfy({ similar($0, corner) }) else { return 1 }
 
+        // Anything within ~40% of the corner color counts as border, which also catches the
+        // anti-aliased ring and any soft shadow where the border meets the artwork.
+        let cutoff = 100
         func isBackground(_ x: Int, _ y: Int) -> Bool {
             let pixel = rgba(x, y)
-            return pixel.a < 128 || (!cornerIsTransparent && similar(pixel, corner))
+            return pixel.a < 128 || (!cornerIsTransparent && distance(pixel, corner) < cutoff)
         }
 
         // The tile is aspect-filled, so at zoom 1 it spans half the shorter side around the center.
         let centerX = CGFloat(width) / 2, centerY = CGFloat(height) / 2
         let halfExtent = CGFloat(min(width, height)) / 2
 
-        // Points just inside the icon outline (same superellipse as `squircle`), as unit offsets.
-        let outline: [CGPoint] = (0..<360).map { step in
-            let angle = CGFloat(step) / 360 * 2 * .pi
-            let c = cos(angle), s = sin(angle)
-            return CGPoint(x: 0.985 * copysign(pow(abs(c), 2 / 5), c), y: 0.985 * copysign(pow(abs(s), 2 / 5), s))
+        // Points on and just outside the icon outline (same superellipse as `squircle`), as unit offsets.
+        let outline: [CGPoint] = [1.0, 1.02].flatMap { radius in
+            (0..<720).map { step in
+                let angle = CGFloat(step) / 720 * 2 * .pi
+                let c = cos(angle), s = sin(angle)
+                return CGPoint(x: radius * copysign(pow(abs(c), 2 / 5), c), y: radius * copysign(pow(abs(s), 2 / 5), s))
+            }
         }
         func isClear(at zoom: CGFloat) -> Bool {
             let reach = halfExtent / zoom
@@ -167,16 +178,16 @@ enum IconRenderer {
             return true
         }
 
-        let range = IconSource.zoomRange
-        if isClear(at: range.lowerBound) { return range.lowerBound }
-        guard isClear(at: range.upperBound) else { return range.lowerBound }
-        var low = range.lowerBound, high = range.upperBound
+        let maximum = IconSource.maximumAutomaticZoom
+        if isClear(at: 1) { return 1 }
+        guard isClear(at: maximum) else { return 1 }
+        var low: CGFloat = 1, high = maximum
         for _ in 0..<20 {
             let middle = (low + high) / 2
             if isClear(at: middle) { high = middle } else { low = middle }
         }
-        // A little extra so anti-aliased edges don't leave a faint line.
-        return min(range.upperBound, high * 1.01)
+        // A little extra so no faint line survives at small icon sizes.
+        return min(maximum, high * 1.02)
     }
 
     // MARK: - Drawing (in 1024pt canvas coordinates)
@@ -191,7 +202,7 @@ enum IconRenderer {
             }
 
         case let .image(image, zoom):
-            let zoom = min(max(zoom, IconSource.zoomRange.lowerBound), IconSource.zoomRange.upperBound)
+            let zoom = max(zoom, 1)
             let grow = tileRect.width * (zoom - 1) / 2
             drawTile(in: context, scale: scale) {
                 drawImage(image, in: tileRect.insetBy(dx: -grow, dy: -grow), fill: true)

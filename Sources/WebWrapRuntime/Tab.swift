@@ -42,8 +42,6 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         observations = [
             webView.observe(\.title) { notifyHost($0, $1) },
             webView.observe(\.isLoading) { notifyHost($0, $1) },
-            webView.observe(\.themeColor) { notifyHost($0, $1) },
-            webView.observe(\.underPageBackgroundColor) { notifyHost($0, $1) },
         ]
     }
 
@@ -51,11 +49,6 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         let title = webView.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !title.isEmpty { return title }
         return webView.url?.host ?? "New Tab"
-    }
-
-    /// The page's <meta name="theme-color">, falling back to its background color.
-    var pageColor: NSColor? {
-        webView.themeColor ?? webView.underPageBackgroundColor
     }
 
     func load(_ url: URL) {
