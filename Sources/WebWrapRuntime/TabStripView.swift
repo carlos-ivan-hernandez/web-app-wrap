@@ -17,9 +17,10 @@ struct StripPalette {
     static let standard = StripPalette(color: .defaultTitleBar)
 }
 
-/// The bar at the top of the window: room for the traffic lights, then the tabs.
-/// With a single tab it's just a plain title bar; with more, the tabs share its full width,
-/// separated by thin dividers. Empty space drags the window and double-click zooms it.
+/// The bar at the top of the window: room for the traffic lights, then the tabs and a "+".
+/// With a single tab it's just a plain title bar. With more, tabs up to 240pt wide (shrinking
+/// to fit when there are many) sit side by side between thin dividers. Empty space drags the
+/// window and double-click zooms it.
 final class TabStripView: NSView {
     struct Item {
         var title: String
@@ -42,7 +43,10 @@ final class TabStripView: NSView {
     private let newTabButton = NSButton()
     private var showsTabs: Bool { tabViews.count > 1 }
 
-    private static let newTabButtonWidth: CGFloat = 40
+    private static let maxTabWidth: CGFloat = 240
+    private static let minTabWidth: CGFloat = 72
+    private static let newTabButtonWidth: CGFloat = 36
+    private static let trailingPadding: CGFloat = 8
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -92,16 +96,19 @@ final class TabStripView: NSView {
 
     override func layout() {
         super.layout()
-        let available = bounds.width - leadingInset - Self.newTabButtonWidth
-        let width = available / CGFloat(max(tabViews.count, 1))
+        let available = bounds.width - leadingInset - Self.newTabButtonWidth - Self.trailingPadding
+        let fitted = available / CGFloat(max(tabViews.count, 1))
+        let width = min(Self.maxTabWidth, max(Self.minTabWidth, fitted))
 
         for (index, view) in tabViews.enumerated() {
             let minX = (leadingInset + CGFloat(index) * width).rounded()
             let maxX = (leadingInset + CGFloat(index + 1) * width).rounded()
             view.frame = NSRect(x: minX, y: 0, width: maxX - minX, height: bounds.height)
         }
+        // Right after the last tab, but never pushed off the edge when tabs are at minimum width.
+        let afterTabs = (leadingInset + CGFloat(tabViews.count) * width).rounded()
         newTabButton.frame = NSRect(
-            x: bounds.width - Self.newTabButtonWidth, y: 0,
+            x: min(afterTabs, bounds.width - Self.newTabButtonWidth - Self.trailingPadding), y: 0,
             width: Self.newTabButtonWidth, height: bounds.height
         )
         onLayout?()

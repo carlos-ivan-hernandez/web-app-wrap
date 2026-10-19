@@ -11,13 +11,14 @@ cookies and storage.
 
 The window has a single bar at the top, in the title-bar color you pick in
 WebWrap, with the close, minimize and zoom buttons on the left. With one tab
-open, that's all it shows. With two or more, the tabs share the bar's full width.
-They're separated by thin dividers, and every tab uses the bar's color. The
+open, that's all it shows. With two or more, tabs up to 240pt wide sit side by
+side, separated by thin dividers, and shrink to fit when there are many. Every
+tab uses the bar's color. The
 selected tab is marked by brighter text and its close button.
 
 | Action | Result |
 | --- | --- |
-| ⌘T, or the `+` at the right end of the tab bar | New tab at the base URL |
+| ⌘T, or the `+` after the last tab | New tab at the base URL |
 | ⌘-click a link | Opens in a new background tab |
 | ⇧⌘-click a link | Opens in a new tab and switches to it |
 | ⌘W, or the tab's × (middle-click also works) | Closes the tab. Closing the last tab quits the app |
@@ -97,12 +98,46 @@ You can recreate an app under the same name, for example to change its icon or
 URL. It keeps its sign-ins, because the app's data is tied to its bundle ID
 (`com.webwrap.app.<name>`).
 
+### Many apps at once (JSON)
+
+Choose **File → Create Apps from JSON…** (⇧⌘O) or click **Create from JSON…**.
+Then pick a JSON file containing an array of apps. Each app takes the same
+inputs as the window:
+
+```json
+[
+  {
+    "name": "WebWrap/Photos",
+    "url": "https://kphotos.vercel.app",
+    "image": "icons/photos.png",
+    "zoom": 1.2,
+    "titleBarColor": "#1a1a1a"
+  },
+  { "name": "Linear", "url": "linear.app" }
+]
+```
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `name` | yes | App name. It may include folders under Applications, as in the window |
+| `url` | yes | Web address |
+| `image` | no | Icon image path, relative to the JSON file unless absolute (`~` works). Without it, WebWrap draws the default icon |
+| `zoom` | no | 1–3, applied on top of the automatic zoom that crops off a border. Defaults to 1 |
+| `titleBarColor` | no | For example `"#1a1a1a"`. Defaults to the site's theme color |
+
+Before building, WebWrap checks the whole file and lists every problem at once,
+such as a missing field, a bad color, an unknown field or two entries with the
+same name. It then shows the apps it's about to create, including any that
+already exist and will be replaced. It builds them one at a time, and if any
+fail, it lists them at the end without stopping the rest.
+
 ### Command line
 
 ```bash
 WebWrap=/Applications/WebWrap.app/Contents/MacOS/WebWrap
 $WebWrap build --name "WebWrap/Linear" --url linear.app
 $WebWrap build --name "Grafana" --url localhost:3000 --image ~/grafana.png --zoom 1.2 --title-bar-color "#1a1a1a" --out ~/Applications
+$WebWrap batch ~/apps.json                         # every app in a JSON file
 $WebWrap icon --name "Linear" --out Linear.icns   # just the icon
 ```
 

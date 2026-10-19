@@ -1,17 +1,26 @@
 import AppKit
 import WebWrapKit
 
-/// Scriptable entry points:
-///   WebWrap build --name "Linear" --url linear.app [--image logo.png] [--zoom 1.2] [--out ~/Applications]
-///   WebWrap icon --name "Linear" [--symbol globe] [--image logo.png] [--zoom 1.2] --out AppIcon.icns
+/// Scriptable entry points; see `usage`.
 enum CommandLineInterface {
     static let usage = """
     Usage:
-      WebWrap                      Open the app.
-      WebWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>] [--title-bar-color <#RRGGBB>]
-                                   (title bar color defaults to the site's theme color) [--out <folder>]
-                                   (--zoom adds to the automatic zoom that crops off a solid or transparent border)
-      WebWrap icon  --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
+      WebWrap
+          Open the app.
+
+      WebWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>]
+                    [--title-bar-color <#RRGGBB>] [--out <folder>]
+          Create one app. <name> may include folders, e.g. "WebWrap/Photos".
+          --zoom adds to the automatic zoom that crops off an image's border.
+          The title bar color defaults to the site's theme color.
+          --out is the folder apps go in (default /Applications).
+
+      WebWrap batch <file.json> [--out <folder>]
+          Create every app listed in a JSON array of objects with the fields
+          name, url, image, zoom and titleBarColor (only name and url are required).
+
+      WebWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
+          Write just the icon.
     """
 
     /// Returns an exit status if the arguments named a command, or nil to launch the GUI.
@@ -21,6 +30,7 @@ enum CommandLineInterface {
         do {
             switch arguments[1] {
             case "build": try build(options)
+            case "batch": return try batch(options)
             case "icon": try icon(options)
             case "help", "--help", "-h": print(usage)
             default: return nil // e.g. flags macOS passes when launching from Finder/Xcode
@@ -73,7 +83,7 @@ enum CommandLineInterface {
             titleBarColor = parsed
         } else {
             // Like the app: default to the site's theme color.
-            titleBarColor = fetchThemeColor(from: url) ?? .defaultTitleBar
+            titleBarColor = waitFor { await ThemeColorFetcher.fetch(from: url) } ?? .defaultTitleBar
         }
         let spec = AppSpec(
             displayName: location.name,
@@ -85,17 +95,50 @@ enum CommandLineInterface {
         print(app.path)
     }
 
-    /// Blocks until the site's theme color is fetched; fine for a one-shot command.
-    private static func fetchThemeColor(from url: URL) -> HexColor? {
-        final class Box: @unchecked Sendable { var color: HexColor? }
-        let box = Box()
+    /// Returns 1 if any app failed, after building all the others.
+    private static func batch(_ options: [String]) throws -> Int32 {
+        guard let path = options.first, !path.hasPrefix("--") else {
+            throw UsageError(message: "batch needs the path of a JSON file.")
+        }
+        let file = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        let data: Data
+        do {
+            data = try Data(contentsOf: file)
+        } catch {
+            throw UsageError(message: "Couldn’t read \(path).")
+        }
+        let entries = try BatchFile.parse(data, baseDirectory: file.deletingLastPathComponent())
+        let root = URL(fileURLWithPath: ((value("--out", in: options) ?? "/Applications") as NSString).expandingTildeInPath)
+
+        let results = waitFor {
+            await BatchBuilder.run(entries, into: root) { index, entry in
+                print("[\(index + 1)/\(entries.count)] \(entry.location.name)…")
+            }
+        }
+        var failures = 0
+        for result in results {
+            switch result.outcome {
+            case let .success(app):
+                print("✓ \(app.path)")
+            case let .failure(error):
+                failures += 1
+                print("✗ \(result.entry.location.name): \(error.localizedDescription)")
+            }
+        }
+        print("\(results.count - failures) of \(results.count) apps created.")
+        return failures == 0 ? 0 : 1
+    }
+
+    /// Runs async work to completion from the synchronous command-line entry point.
+    private static func waitFor<T>(_ work: @escaping () async -> T) -> T {
+        let box = ResultBox<T>()
         let done = DispatchSemaphore(value: 0)
         Task.detached {
-            box.color = await ThemeColorFetcher.fetch(from: url)
+            box.value = await work()
             done.signal()
         }
         done.wait()
-        return box.color
+        return box.value!
     }
 
     private static func icon(_ options: [String]) throws {
@@ -105,4 +148,9 @@ enum CommandLineInterface {
         try IconRenderer.writeICNS(try iconSource(name: name, options: options), to: destination)
         print(destination.path)
     }
+}
+
+/// Hands a result from a detached task back to the thread waiting on the semaphore.
+private final class ResultBox<T>: @unchecked Sendable {
+    var value: T?
 }

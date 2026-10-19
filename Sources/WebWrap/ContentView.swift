@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var model = BuilderModel()
+    @ObservedObject var model: BuilderModel
     @State private var isDropTargeted = false
 
     var body: some View {
@@ -133,6 +133,9 @@ struct ContentView: View {
         HStack(spacing: 10) {
             statusView
             Spacer()
+            Button("Create from JSON…") { model.createAppsFromJSON() }
+                .disabled(model.status.isBusy)
+                .help("Create several apps from a JSON file (⇧⌘O)")
             Button("Create App") { model.createApp() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.canBuild)
@@ -156,6 +159,18 @@ struct ContentView: View {
         case let .failed(message):
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             Text(message).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled)
+        case let .buildingBatch(current, total, name):
+            ProgressView().controlSize(.small)
+            Text("Building \(current) of \(total): \(name)…")
+                .foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+        case let .batchFinished(created, failed):
+            Image(systemName: failed == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(failed == 0 ? .green : .orange)
+            Text(failed == 0 ? "Created \(created.count) apps" : "Created \(created.count), \(failed) failed")
+                .lineLimit(1)
+            if !created.isEmpty {
+                Button("Show in Finder") { model.reveal(created) }
+            }
         }
     }
 

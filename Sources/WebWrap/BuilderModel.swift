@@ -10,6 +10,16 @@ final class BuilderModel: ObservableObject {
         case building
         case finished(URL)
         case failed(String)
+        /// Building app `current` (1-based) of `total` from a JSON file.
+        case buildingBatch(current: Int, total: Int, name: String)
+        case batchFinished(created: [URL], failed: Int)
+
+        var isBusy: Bool {
+            switch self {
+            case .building, .buildingBatch: true
+            default: false
+            }
+        }
     }
 
     @Published var displayName = ""
@@ -46,7 +56,7 @@ final class BuilderModel: ObservableObject {
     var destination: URL { location.bundleURL(in: Self.applicationsFolder) }
     var normalizedURL: URL? { InputNormalizer.normalizeURL(urlString) }
     var bundleIdentifier: String { InputNormalizer.bundleIdentifier(for: trimmedName) }
-    var canBuild: Bool { !trimmedName.isEmpty && normalizedURL != nil && status != .building }
+    var canBuild: Bool { !trimmedName.isEmpty && normalizedURL != nil && !status.isBusy }
 
     var iconSource: IconSource {
         if let customImage { return .image(customImage, zoom: baseZoom * CGFloat(imageZoom)) }
@@ -160,5 +170,79 @@ final class BuilderModel: ObservableObject {
 
     func reveal(_ app: URL) {
         NSWorkspace.shared.activateFileViewerSelecting([app])
+    }
+
+    func reveal(_ apps: [URL]) {
+        NSWorkspace.shared.activateFileViewerSelecting(apps)
+    }
+
+    // MARK: - Batch from JSON
+
+    /// Asks for a JSON file (see BatchFile for the format), confirms, then builds every app in it.
+    func createAppsFromJSON() {
+        guard !status.isBusy else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a JSON file listing the apps to create."
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, let file = panel.url else { return }
+
+        let entries: [BatchEntry]
+        do {
+            let data = try Data(contentsOf: file)
+            entries = try BatchFile.parse(data, baseDirectory: file.deletingLastPathComponent())
+        } catch {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "\(file.lastPathComponent) can’t be used"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+            return
+        }
+
+        let root = Self.applicationsFolder
+        let destinations = entries.map { $0.location.bundleURL(in: root) }
+        let existing = destinations.filter { FileManager.default.fileExists(atPath: $0.path) }
+        let alert = NSAlert()
+        alert.messageText = "Create \(entries.count) app\(entries.count == 1 ? "" : "s")?"
+        var details = destinations.prefix(12).map(\.path).joined(separator: "\n")
+        if destinations.count > 12 { details += "\n…and \(destinations.count - 12) more" }
+        if !existing.isEmpty {
+            details += "\n\n\(existing.count) already exist\(existing.count == 1 ? "s" : ""). The old copies will be moved to the Trash; their sign-ins and settings are kept."
+        }
+        alert.informativeText = details
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        status = .buildingBatch(current: 1, total: entries.count, name: entries[0].location.name)
+        Task {
+            let results = await Task.detached(priority: .userInitiated) {
+                await BatchBuilder.run(entries, into: root) { index, entry in
+                    await MainActor.run {
+                        self.status = .buildingBatch(current: index + 1, total: entries.count, name: entry.location.name)
+                    }
+                }
+            }.value
+
+            var created: [URL] = []
+            var failures: [String] = []
+            for result in results {
+                switch result.outcome {
+                case let .success(app): created.append(app)
+                case let .failure(error): failures.append("\(result.entry.location.name): \(error.localizedDescription)")
+                }
+            }
+            status = .batchFinished(created: created, failed: failures.count)
+
+            if !failures.isEmpty {
+                let report = NSAlert()
+                report.alertStyle = .warning
+                report.messageText = "\(failures.count) of \(results.count) apps couldn’t be created"
+                report.informativeText = failures.joined(separator: "\n")
+                report.runModal()
+            }
+        }
     }
 }
