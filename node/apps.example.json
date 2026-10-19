@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Photos",
+    "url": "https://kphotos.vercel.app",
+    "titleBarColor": "#1a1a1a"
+  },
+  {
+    "name": "GitHub",
+    "url": "github.com"
+  }
+]
