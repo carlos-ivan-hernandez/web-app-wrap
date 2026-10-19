@@ -110,6 +110,19 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         appDelegate.pageZoom = zoom
     }
 
+    /// WKWebView has no public call to open Web Inspector, so this uses its private inspector
+    /// object, checking each step so a future WebKit change makes it a no-op rather than a crash.
+    func showWebInspector() {
+        guard webView.responds(to: NSSelectorFromString("_inspector")),
+              let inspector = webView.value(forKey: "_inspector") as? NSObject,
+              inspector.responds(to: NSSelectorFromString("show"))
+        else {
+            NSSound.beep()
+            return
+        }
+        inspector.perform(NSSelectorFromString("show"))
+    }
+
     // MARK: - Navigation policy
 
     func webView(

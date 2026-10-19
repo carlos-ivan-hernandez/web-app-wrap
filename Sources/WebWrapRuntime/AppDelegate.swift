@@ -66,6 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configuration.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.preferences.isElementFullscreenEnabled = true
+        // Adds "Inspect Element" to the right-click menu. There's no public API for this; the
+        // key has been stable in WebKit for years, and is skipped if it ever disappears.
+        if configuration.preferences.responds(to: NSSelectorFromString("_developerExtrasEnabled")) {
+            configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        }
         return configuration
     }
 

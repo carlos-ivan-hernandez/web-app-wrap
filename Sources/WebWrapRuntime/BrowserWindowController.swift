@@ -272,6 +272,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         NSWorkspace.shared.open(url)
     }
 
+    /// Opens Web Inspector for the current tab (also available via right-click > Inspect Element).
+    @objc func showWebInspector(_ sender: Any?) {
+        selectedTab?.showWebInspector()
+    }
+
+    @objc func reloadIgnoringCache(_ sender: Any?) {
+        selectedTab?.webView.reloadFromOrigin()
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         let webView = selectedTab?.webView
         switch menuItem.action {

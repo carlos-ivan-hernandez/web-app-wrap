@@ -30,6 +30,8 @@ the web app.
 | ⌘+ / ⌘- / ⌘0 | Zoom in, zoom out, actual size |
 | ⇧⌘C | Copy the page's link |
 | ⇧⌘O | Open the page in your default browser |
+| ⌥⌘I, or right-click → Inspect Element | Web Inspector (console, network, elements) |
+| ⌥⌘R | Reload, bypassing the cache |
 
 ### Which links stay in the app
 

@@ -13,6 +13,7 @@ enum MainMenu {
         menuBar.addItem(submenu("Edit", makeEditMenu()))
         menuBar.addItem(submenu("View", makeViewMenu()))
         menuBar.addItem(submenu("History", makeHistoryMenu()))
+        menuBar.addItem(submenu("Developer", makeDeveloperMenu()))
         menuBar.addItem(submenu("Window", windowMenu))
 
         NSApp.mainMenu = menuBar
@@ -76,6 +77,13 @@ enum MainMenu {
         menu.addItem(item("Back", #selector(BrowserWindowController.navigateBack(_:)), "["))
         menu.addItem(item("Forward", #selector(BrowserWindowController.navigateForward(_:)), "]"))
         menu.addItem(item("Home", #selector(BrowserWindowController.goHome(_:)), "h", [.command, .shift]))
+        return menu
+    }
+
+    private static func makeDeveloperMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(item("Show Web Inspector", #selector(BrowserWindowController.showWebInspector(_:)), "i", [.command, .option]))
+        menu.addItem(item("Reload Ignoring Cache", #selector(BrowserWindowController.reloadIgnoringCache(_:)), "r", [.command, .option]))
         return menu
     }
 
