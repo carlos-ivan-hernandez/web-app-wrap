@@ -42,6 +42,7 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         observations = [
             webView.observe(\.title) { notifyHost($0, $1) },
             webView.observe(\.isLoading) { notifyHost($0, $1) },
+            webView.observe(\.url) { notifyHost($0, $1) },
         ]
     }
 

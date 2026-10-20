@@ -78,6 +78,13 @@ struct HelpView: View {
             The list and the icon images are kept in ~/Library/Application Support/WebAppWrap, so you \
             don’t need the original image files again. A replaced icon is moved to the previous-icons folder there.
             """)
+            paragraph("""
+            **Extensions** installs browser extensions once for every app: import them from Chrome \
+            (or Brave, Edge, Vivaldi, Arc), or add an unpacked folder, .zip or .crx. Each extension is \
+            on for all apps until you change it, by double-clicking it or in an app’s Edit sheet. \
+            Apps pick up changes when you switch to them, with no rebuild, and have an Extensions menu \
+            of their own. Extensions need macOS 15.4 or later.
+            """)
             paragraph("**The command line.** The same features, for scripts and automation. See below.")
         }
     }

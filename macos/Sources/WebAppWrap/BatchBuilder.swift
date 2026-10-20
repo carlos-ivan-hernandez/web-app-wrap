@@ -15,7 +15,7 @@ enum BatchBuilder {
 
     /// The same choices the window makes: automatic icon zoom times the entry's zoom, and the
     /// site's theme color unless the entry names a color.
-    static func spec(for entry: BatchEntry) async throws -> AppSpec {
+    static func spec(for entry: BatchEntry, appID: UUID? = nil) async throws -> AppSpec {
         var icon = IconSource.generated(name: entry.location.name)
         if let imageURL = entry.image {
             guard let image = NSImage(contentsOf: imageURL), image.isValid else {
@@ -29,12 +29,14 @@ enum BatchBuilder {
         } else if let siteColor = await ThemeColorFetcher.fetch(from: entry.url) {
             titleBarColor = siteColor
         }
-        return AppSpec(displayName: entry.location.name, baseURL: entry.url, icon: icon, titleBarColor: titleBarColor)
+        return AppSpec(displayName: entry.location.name, baseURL: entry.url, icon: icon, titleBarColor: titleBarColor, appID: appID)
     }
 
-    /// `progress` is called before each app with its zero-based index.
+    /// `progress` is called before each app with its zero-based index. `appIDs`, if given,
+    /// has each entry's ID in WebAppWrap's list.
     static func run(
         _ entries: [BatchEntry],
+        appIDs: [UUID]? = nil,
         into root: URL,
         progress: @escaping (Int, BatchEntry) async -> Void = { _, _ in }
     ) async -> [Result] {
@@ -42,7 +44,7 @@ enum BatchBuilder {
         for (index, entry) in entries.enumerated() {
             await progress(index, entry)
             do {
-                let spec = try await spec(for: entry)
+                let spec = try await spec(for: entry, appID: appIDs?[index])
                 let app = try AppBuilder.build(spec, to: entry.location.bundleURL(in: root))
                 results.append(Result(entry: entry, outcome: .success(app)))
             } catch {

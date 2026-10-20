@@ -16,6 +16,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let contentContainer = NSView()
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
+    /// Extension buttons at the right end of the tab strip.
+    private let extensionToolbar = NSStackView()
+    private var toolbarButtons: [String: ExtensionToolbarButton] = [:]
 
     init(appDelegate: AppDelegate) {
         self.appDelegate = appDelegate
@@ -73,6 +76,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         tabStrip.onMove = { [weak self] from, to in self?.moveTab(from: from, to: to) }
         // AppKit re-lays out the title bar on resize, focus and appearance changes; put the buttons back each time.
         tabStrip.onLayout = { [weak self] in self?.layoutTrafficLights() }
+
+        extensionToolbar.orientation = .horizontal
+        extensionToolbar.spacing = 2
+        extensionToolbar.isHidden = true
+        tabStrip.trailingAccessory = extensionToolbar
     }
 
     @available(*, unavailable)
@@ -82,10 +90,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     // MARK: - Tabs
 
-    /// Adds a tab. Link-opened tabs go right after their opener; others go at the end.
+    /// Adds a tab. Link-opened tabs go right after their opener; others go at the end, or at
+    /// `index` when an extension asks for a position.
     /// Pass `url: nil` with WebKit's `configuration` when WebKit itself will load the page.
     @discardableResult
-    func openTab(url: URL?, configuration: WKWebViewConfiguration? = nil, after opener: Tab? = nil, activate: Bool = true) -> Tab {
+    func openTab(
+        url: URL?,
+        configuration: WKWebViewConfiguration? = nil,
+        after opener: Tab? = nil,
+        at requestedIndex: Int? = nil,
+        activate: Bool = true
+    ) -> Tab {
         let tab = Tab(
             appDelegate: appDelegate,
             policy: appDelegate.config.policy,
@@ -96,8 +111,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         tab.webView.frame = contentContainer.bounds
         tab.webView.autoresizingMask = [.width, .height]
 
-        let index = opener.flatMap { tabs.firstIndex(of: $0) }.map { $0 + 1 } ?? tabs.count
+        var index = opener.flatMap { tabs.firstIndex(of: $0) }.map { $0 + 1 } ?? tabs.count
+        if let requestedIndex, (0...tabs.count).contains(requestedIndex) { index = requestedIndex }
         tabs.insert(tab, at: index)
+        if #available(macOS 15.4, *) {
+            extensionController?.didOpenTab(tab)
+        }
 
         if activate || selectedTab == nil {
             select(tab)
@@ -111,10 +130,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func select(_ tab: Tab) {
         guard tabs.contains(tab) else { return }
         if selectedTab !== tab {
+            let previous = selectedTab
             selectedTab?.webView.removeFromSuperview()
             tab.webView.frame = contentContainer.bounds
             contentContainer.addSubview(tab.webView)
             selectedTab = tab
+            if #available(macOS 15.4, *) {
+                extensionController?.didActivateTab(tab, previousActiveTab: previous)
+            }
+            refreshExtensionToolbar()
         }
         window?.makeFirstResponder(tab.webView)
         tabDidChange(tab)
@@ -128,6 +152,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             return
         }
         tabs.remove(at: index)
+        if #available(macOS 15.4, *) {
+            extensionController?.didCloseTab(tab, windowIsClosing: false)
+        }
         tab.tearDown()
         if selectedTab === tab {
             selectedTab = nil
@@ -142,6 +169,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         guard tabs.indices.contains(source), tabs.indices.contains(destination), source != destination else { return }
         let tab = tabs.remove(at: source)
         tabs.insert(tab, at: destination)
+        if #available(macOS 15.4, *) {
+            extensionController?.didMoveTab(tab, from: source, in: self)
+        }
         refreshStrip()
     }
 
@@ -149,7 +179,55 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if tab === selectedTab {
             window?.title = tab.displayTitle
         }
+        if #available(macOS 15.4, *), tabs.contains(tab) {
+            extensionController?.didChangeTabProperties([.title, .loading, .url], for: tab)
+        }
         refreshStrip()
+    }
+
+    // MARK: - Extensions
+
+    @available(macOS 15.4, *)
+    private var extensionController: WKWebExtensionController? {
+        appDelegate.extensionHost?.controller
+    }
+
+    /// The button an extension's popup is shown under.
+    func toolbarButton(for extensionID: String) -> NSView? {
+        toolbarButtons[extensionID]
+    }
+
+    /// One button per loaded extension that has a toolbar action, showing its icon, label and
+    /// badge for the selected tab. Called when extensions load or change, and on tab switches.
+    func refreshExtensionToolbar() {
+        guard #available(macOS 15.4, *), let host = appDelegate.extensionHost else { return }
+        var shown: [ExtensionToolbarButton] = []
+        for item in host.loaded {
+            let context = item.context
+            guard let action = context.action(for: selectedTab) else { continue }
+            let id = item.installed.id
+            let button = toolbarButtons[id] ?? ExtensionToolbarButton()
+            toolbarButtons[id] = button
+            let size = CGSize(width: 16, height: 16)
+            button.image = action.icon(for: size) ?? context.webExtension.icon(for: size)
+                ?? NSImage(systemSymbolName: "puzzlepiece.extension", accessibilityDescription: nil)
+            button.toolTip = action.label.isEmpty ? item.installed.name : action.label
+            button.badgeText = action.badgeText
+            button.isEnabled = action.isEnabled
+            button.contentTintColor = tabStrip.palette.foreground.withAlphaComponent(0.7)
+            button.onClick = { [weak self] in
+                context.performAction(for: self?.selectedTab)
+            }
+            shown.append(button)
+        }
+        let shownIDs = Set(host.loaded.map(\.installed.id))
+        toolbarButtons = toolbarButtons.filter { shownIDs.contains($0.key) && shown.contains($0.value) }
+        if extensionToolbar.arrangedSubviews != shown.map({ $0 as NSView }) {
+            extensionToolbar.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            shown.forEach(extensionToolbar.addArrangedSubview)
+        }
+        extensionToolbar.isHidden = shown.isEmpty
+        tabStrip.needsLayout = true
     }
 
     private func refreshStrip() {
@@ -197,7 +275,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowDidResize(_ notification: Notification) { layoutTrafficLights() }
-    func windowDidBecomeKey(_ notification: Notification) { layoutTrafficLights() }
+    func windowDidBecomeKey(_ notification: Notification) {
+        layoutTrafficLights()
+        if #available(macOS 15.4, *) {
+            extensionController?.didFocusWindow(self)
+        }
+    }
     func windowDidResignKey(_ notification: Notification) { layoutTrafficLights() }
 
     func windowWillEnterFullScreen(_ notification: Notification) {
@@ -216,6 +299,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        if #available(macOS 15.4, *), let extensionController {
+            tabs.forEach { extensionController.didCloseTab($0, windowIsClosing: true) }
+            extensionController.didCloseWindow(self)
+        }
         tabs.forEach { $0.tearDown() }
         tabs = []
         selectedTab = nil

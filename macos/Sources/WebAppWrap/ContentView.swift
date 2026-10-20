@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The main window: make one app now (One-Off), or keep a list of apps and build them (My Apps).
@@ -9,6 +10,7 @@ struct ContentView: View {
             Picker("Mode", selection: $model.mode) {
                 Text("One-Off").tag(BuilderModel.Mode.oneOff)
                 Text("My Apps").tag(BuilderModel.Mode.list)
+                Text("Extensions").tag(BuilderModel.Mode.extensions)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -18,9 +20,14 @@ struct ContentView: View {
             switch model.mode {
             case .oneOff: OneOffView(model: model, draft: model.oneOff)
             case .list: AppListView(model: model)
+            case .extensions: ExtensionsView(model: model)
             }
         }
         .frame(width: 620)
+        // Apps can turn extensions on and off from their own Extensions menu.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.reloadExtensions()
+        }
     }
 }
 

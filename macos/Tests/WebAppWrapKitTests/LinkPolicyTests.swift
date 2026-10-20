@@ -34,6 +34,7 @@ final class LinkPolicyTests: XCTestCase {
     func testInlineSchemesStayInApp() {
         XCTAssertEqual(dest("about:blank"), .app)
         XCTAssertEqual(dest("blob:https://app.example.com/abc"), .app)
+        XCTAssertEqual(dest("webkit-extension://dark-reader/options.html"), .app)
     }
 
     func testWWWBase() {

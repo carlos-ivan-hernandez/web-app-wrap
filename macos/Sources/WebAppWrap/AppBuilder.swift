@@ -7,6 +7,8 @@ struct AppSpec {
     var baseURL: URL
     var icon: IconSource
     var titleBarColor: HexColor = .defaultTitleBar
+    /// The app's ID in WebAppWrap's list, so it can find its extension settings.
+    var appID: UUID?
 
     var bundleIdentifier: String { InputNormalizer.bundleIdentifier(for: displayName) }
 }
@@ -119,6 +121,9 @@ enum AppBuilder {
         // Which WebAppWrap built the app.
         if let commit = GeneratorVersion.commit {
             plist[WrapperInfoKeys.generatorCommit] = commit
+        }
+        if let appID = spec.appID {
+            plist[WrapperInfoKeys.appID] = appID.uuidString.lowercased()
         }
         return plist
     }

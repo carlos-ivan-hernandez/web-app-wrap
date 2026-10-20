@@ -17,7 +17,8 @@ struct StripPalette {
     static let standard = StripPalette(color: .defaultTitleBar)
 }
 
-/// The bar at the top of the window: room for the traffic lights, then the tabs and a "+".
+/// The bar at the top of the window: room for the traffic lights, then the tabs and a "+",
+/// and on the right any extension toolbar buttons (`trailingAccessory`).
 /// With a single tab it's just a plain title bar. With more, tabs up to 240pt wide (shrinking
 /// to fit when there are many) sit side by side between thin dividers. Empty space drags the
 /// window and double-click zooms it. Tabs can be dragged sideways to reorder them.
@@ -39,6 +40,20 @@ final class TabStripView: NSView {
 
     var palette = StripPalette.standard {
         didSet { applyPalette() }
+    }
+
+    /// Shown at the right end of the bar, sized to fit. Used for extension buttons.
+    var trailingAccessory: NSView? {
+        didSet {
+            oldValue?.removeFromSuperview()
+            if let trailingAccessory { addSubview(trailingAccessory) }
+            needsLayout = true
+        }
+    }
+
+    private var accessoryWidth: CGFloat {
+        guard let trailingAccessory, !trailingAccessory.isHidden else { return 0 }
+        return ceil(trailingAccessory.fittingSize.width)
     }
 
     private var tabViews: [TabItemView] = []
@@ -106,14 +121,18 @@ final class TabStripView: NSView {
         // Right after the last tab, but never pushed off the edge when tabs are at minimum width.
         let afterTabs = (leadingInset + CGFloat(tabViews.count) * tabWidth).rounded()
         newTabButton.frame = NSRect(
-            x: min(afterTabs, bounds.width - Self.newTabButtonWidth - Self.trailingPadding), y: 0,
+            x: min(afterTabs, bounds.width - accessoryWidth - Self.newTabButtonWidth - Self.trailingPadding), y: 0,
             width: Self.newTabButtonWidth, height: bounds.height
+        )
+        trailingAccessory?.frame = NSRect(
+            x: bounds.width - accessoryWidth - Self.trailingPadding, y: 0,
+            width: accessoryWidth, height: bounds.height
         )
         onLayout?()
     }
 
     private var tabWidth: CGFloat {
-        let available = bounds.width - leadingInset - Self.newTabButtonWidth - Self.trailingPadding
+        let available = bounds.width - leadingInset - accessoryWidth - Self.newTabButtonWidth - Self.trailingPadding
         let fitted = available / CGFloat(max(tabViews.count, 1))
         return min(Self.maxTabWidth, max(Self.minTabWidth, fitted))
     }

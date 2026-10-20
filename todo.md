@@ -27,6 +27,15 @@ have them yet:
       `apps.json`, `icons/` (a copy of each app's source image) and
       `previous-icons/` (replaced or removed icons, named after the app and the
       time).
+- [ ] **Shared browser extensions.** Install once in WebAppWrap (import from
+      Chromium browsers, or a folder, .zip or .crx), on for all apps by
+      default with per-app overrides, kept in `extensions.json` and
+      `extensions/` next to `apps.json`. Wrapped apps read the list at launch
+      and when activated. WebView2 can load unpacked extensions
+      (`CoreWebView2Profile.AddBrowserExtensionAsync`, with
+      `AreBrowserExtensionsEnabled`), but it has no toolbar or popups and less
+      API coverage, so per-tab and window APIs and toolbar buttons may not be
+      possible. Stamp each app's list ID into its `app.json`.
 
 On macOS, the code to follow is:
 
@@ -34,5 +43,8 @@ On macOS, the code to follow is:
   list format, skip rules and icon storage
 - `macos/Sources/WebAppWrap/BuilderModel.swift`, `AppListView.swift`
 - `macos/scripts/build.sh`: stamping the commit
+- `macos/Sources/WebAppWrapKit/ExtensionStore.swift`, `ExtensionManifest.swift`,
+  `macos/Sources/WebAppWrap/ExtensionsModel.swift`, `ExtensionsView.swift`, and
+  `macos/Sources/WebAppWrapRuntime/ExtensionHost.swift`, `ExtensionSupport.swift`
 
-Keep `apps.json` in the same format on both platforms.
+Keep `apps.json` and `extensions.json` in the same format on both platforms.

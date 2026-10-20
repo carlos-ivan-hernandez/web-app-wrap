@@ -12,7 +12,9 @@ struct AppListView: View {
     /// What the add/edit sheet is showing. A new draft each time the sheet opens.
     struct EditorTarget: Identifiable {
         let id = UUID()
-        let recordID: UUID?
+        /// A fresh ID when adding an app.
+        let recordID: UUID
+        let isNew: Bool
         let draft: AppDraft
     }
 
@@ -95,7 +97,7 @@ struct AppListView: View {
         }
         .padding(24)
         .sheet(item: $editing) { target in
-            AppEditorSheet(model: model, recordID: target.recordID, draft: target.draft)
+            AppEditorSheet(model: model, recordID: target.recordID, isNew: target.isNew, draft: target.draft)
         }
     }
 
@@ -108,12 +110,12 @@ struct AppListView: View {
     }
 
     private func add() {
-        editing = EditorTarget(recordID: nil, draft: AppDraft())
+        editing = EditorTarget(recordID: UUID(), isNew: true, draft: AppDraft())
     }
 
     private func edit(_ id: UUID) {
         guard !model.status.isBusy, let record = model.findRecord(id) else { return }
-        editing = EditorTarget(recordID: id, draft: AppDraft(settings: record.settings, iconURL: model.iconURL(for: record)))
+        editing = EditorTarget(recordID: id, isNew: false, draft: AppDraft(settings: record.settings, iconURL: model.iconURL(for: record)))
     }
 
     private func confirmRemove(_ id: UUID) {
@@ -192,17 +194,24 @@ private struct AppRow: View {
 /// Adds an app to the list, or edits one. Saving doesn't build; Build Apps does.
 struct AppEditorSheet: View {
     @ObservedObject var model: BuilderModel
-    let recordID: UUID?
+    let recordID: UUID
+    let isNew: Bool
     @ObservedObject var draft: AppDraft
     @Environment(\.dismiss) private var dismiss
     @State private var error: String?
+    /// Extension ID -> on or off for this app, saved with the app.
+    @State private var extensionStates: [String: Bool] = [:]
+    @State private var initialExtensionStates: [String: Bool] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(recordID == nil ? "Add App" : "Edit App").font(.title2.weight(.semibold))
+            Text(isNew ? "Add App" : "Edit App").font(.title2.weight(.semibold))
             AppForm(draft: draft) { save() }
             if let note = renameNote {
                 Text(note).font(.caption).foregroundStyle(.secondary)
+            }
+            if !model.extensions.isEmpty {
+                extensionSwitches
             }
             Divider()
             HStack(spacing: 10) {
@@ -213,18 +222,40 @@ struct AppEditorSheet: View {
                 Spacer()
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button(recordID == nil ? "Add" : "Save") { save() }
+                Button(isNew ? "Add" : "Save") { save() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!draft.isValid)
             }
         }
         .padding(24)
         .frame(width: 620)
+        .onAppear {
+            extensionStates = Dictionary(uniqueKeysWithValues: model.extensions.map { ($0.id, $0.isEnabled(forApp: recordID)) })
+            initialExtensionStates = extensionStates
+        }
+    }
+
+    private var extensionSwitches: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Extensions").font(.headline)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), alignment: .leading)], alignment: .leading, spacing: 6) {
+                ForEach(model.extensions) { installed in
+                    Toggle(installed.name, isOn: Binding(
+                        get: { extensionStates[installed.id] ?? installed.isEnabled(forApp: recordID) },
+                        set: { extensionStates[installed.id] = $0 }
+                    ))
+                    .lineLimit(1)
+                }
+            }
+            Text("Changes take effect the next time you switch to the app. No rebuild needed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// Renaming points the list at a new app; the one built under the old name isn't removed.
     private var renameNote: String? {
-        guard let recordID, let record = model.findRecord(recordID), record.lastBuild != nil else { return nil }
+        guard !isNew, let record = model.findRecord(recordID), record.lastBuild != nil else { return nil }
         let old = model.appURL(for: record)
         guard record.settings.location.key != draft.location.key, FileManager.default.fileExists(atPath: old.path) else { return nil }
         return "Renaming doesn’t remove \(old.path). Delete it yourself if you no longer want it."
@@ -233,6 +264,8 @@ struct AppEditorSheet: View {
     private func save() {
         do {
             try model.save(draft, as: recordID)
+            // Only the switches changed here, so changes made meanwhile from an app's menu are kept.
+            model.setExtensions(extensionStates.filter { initialExtensionStates[$0.key] != $0.value }, forApp: recordID)
             dismiss()
         } catch {
             self.error = error.localizedDescription

@@ -24,6 +24,7 @@ final class BuilderModel: ObservableObject {
     enum Mode: String {
         case oneOff
         case list
+        case extensions
     }
 
     @Published var mode = Mode.oneOff
@@ -37,6 +38,11 @@ final class BuilderModel: ObservableObject {
     /// damaged file is never overwritten.
     @Published private(set) var loadError: String?
 
+    let extensionStore = ExtensionStore.standard
+    /// Browser extensions installed once and shared by every app (see ExtensionsModel.swift).
+    @Published var extensions: [InstalledExtension] = []
+    @Published var extensionsLoadError: String?
+
     init() {
         oneOff = AppDraft()
         do {
@@ -45,6 +51,7 @@ final class BuilderModel: ObservableObject {
             loadError = "\(registry.listFile.path) couldn’t be read: \(error.localizedDescription)"
         }
         if !records.isEmpty { mode = .list }
+        reloadExtensions()
     }
 
     // MARK: - One-off
@@ -56,6 +63,8 @@ final class BuilderModel: ObservableObject {
         let draft = oneOff
         guard canCreateOneOff, let url = draft.normalizedURL else { return }
         let destination = draft.destination
+        let key = draft.location.key
+        let appID = records.first { $0.settings.location.key == key }?.id ?? UUID()
 
         if FileManager.default.fileExists(atPath: destination.path) {
             let alert = NSAlert()
@@ -66,7 +75,7 @@ final class BuilderModel: ObservableObject {
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
 
-        let spec = AppSpec(displayName: draft.trimmedName, baseURL: url, icon: draft.iconSource, titleBarColor: draft.titleBarHex)
+        let spec = AppSpec(displayName: draft.trimmedName, baseURL: url, icon: draft.iconSource, titleBarColor: draft.titleBarHex, appID: appID)
         status = .building
         Task {
             let result = await Task.detached(priority: .userInitiated) {
@@ -76,7 +85,7 @@ final class BuilderModel: ObservableObject {
             case let .success(app):
                 status = .finished(app)
                 do {
-                    try recordOneOff(draft)
+                    try recordOneOff(draft, id: appID)
                 } catch {
                     status = .failed("Created \(app.lastPathComponent), but it couldn’t be added to your apps: \(error.localizedDescription)")
                 }
@@ -87,10 +96,9 @@ final class BuilderModel: ObservableObject {
     }
 
     /// Adds the app to the list, or updates the entry with the same name, marked as just built.
-    private func recordOneOff(_ draft: AppDraft) throws {
-        let key = draft.location.key
-        let existing = records.first { $0.settings.location.key == key }
-        var record = existing ?? AppRecord(settings: AppSettings(name: "", url: ""))
+    private func recordOneOff(_ draft: AppDraft, id: UUID) throws {
+        let existing = findRecord(id)
+        var record = existing ?? AppRecord(id: id, settings: AppSettings(name: "", url: ""))
         record.settings = try settings(from: draft, id: record.id, replacing: existing?.settings)
         record.lastBuild = BuildStamp(version: GeneratorVersion.commit, date: Date(), settings: record.settings)
         try store(record)
@@ -117,8 +125,8 @@ final class BuilderModel: ObservableObject {
         record.settings.icon.map(registry.iconURL)
     }
 
-    /// A message saying why `draft` can't be saved as `id` (nil for a new app), or nil if it can.
-    func problem(saving draft: AppDraft, as id: UUID?) -> String? {
+    /// A message saying why `draft` can't be saved as app `id`, or nil if it can.
+    func problem(saving draft: AppDraft, as id: UUID) -> String? {
         if loadError != nil { return "Your list of apps couldn’t be read, so it can’t be changed." }
         guard draft.isValid else { return "Enter an app name and a web address." }
         let key = draft.location.key
@@ -128,13 +136,13 @@ final class BuilderModel: ObservableObject {
         return nil
     }
 
-    /// Saves an added or edited app. Building happens separately.
-    func save(_ draft: AppDraft, as id: UUID?) throws {
+    /// Saves an added or edited app as `id` (a new ID adds it). Building happens separately.
+    func save(_ draft: AppDraft, as id: UUID) throws {
         if let problem = problem(saving: draft, as: id) {
             throw SaveError(message: problem)
         }
-        let existing = id.flatMap(findRecord)
-        var record = existing ?? AppRecord(settings: AppSettings(name: "", url: ""))
+        let existing = findRecord(id)
+        var record = existing ?? AppRecord(id: id, settings: AppSettings(name: "", url: ""))
         record.settings = try settings(from: draft, id: record.id, replacing: existing?.settings)
         try store(record)
     }
@@ -228,7 +236,7 @@ final class BuilderModel: ObservableObject {
         status = .buildingList(current: 1, total: jobs.count, name: jobs.first?.1.location.name ?? "")
         Task {
             let results = await Task.detached(priority: .userInitiated) {
-                await BatchBuilder.run(jobs.map { $0.1 }, into: root) { index, entry in
+                await BatchBuilder.run(jobs.map { $0.1 }, appIDs: jobs.map { $0.0.id }, into: root) { index, entry in
                     await MainActor.run {
                         self.status = .buildingList(current: index + 1, total: jobs.count, name: entry.location.name)
                     }

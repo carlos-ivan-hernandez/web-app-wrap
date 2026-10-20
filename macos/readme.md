@@ -62,8 +62,11 @@ Source code and issues: https://github.com/carlos-ivan-hernandez/web-app-wrap
 ## Requirements
 
 - macOS 13 Ventura or later
-- To build: Xcode or the Xcode command line tools (`xcode-select --install`).
-  Building needs Swift 5.9 or later.
+- To build: Xcode 16.3 or later, or its command line tools
+  (`xcode-select --install`). The macOS 15.4 SDK they include is needed for
+  extension support.
+- Extensions in generated apps need macOS 15.4 or later. On older systems the
+  apps work as before, without extensions.
 
 Generated apps need nothing extra. Each one includes everything it needs.
 
@@ -153,6 +156,61 @@ WebAppWrap keeps its files in `~/Library/Application Support/WebAppWrap`:
 
 Renaming an app in the list doesn't remove the app built under the old name.
 
+### Extensions
+
+Install a browser extension once, and every app WebAppWrap creates can use it.
+Generated apps load extensions with WebKit's web extension support, which reads
+the same format as Chrome, so most Chrome extensions work. Extensions need
+macOS 15.4 or later.
+
+1. Choose **Extensions** at the top of the window.
+2. Click **+**, then either:
+   - **Import from Chrome or Another Browser…** lists the extensions installed
+     in Chrome, Chromium, Brave, Edge, Vivaldi and Arc. Pick the ones you want.
+   - **Add from File or Folder…** takes an unpacked extension folder (with a
+     `manifest.json`), a `.zip` or a `.crx`.
+3. WebAppWrap shows what each extension can access and warns about anything
+   WebKit doesn't support. Installing grants those permissions.
+
+A new extension is on for all apps. To change that, double-click it (or click
+**Choose Apps…**): turn the default off, or turn it on or off for individual
+apps. An app's **Edit** sheet in My Apps has the same switches.
+
+Each app also has an **Extensions** menu. There you can turn an extension on or
+off for that app, click its toolbar button, or open its options. Extension
+buttons appear at the right end of the tab bar, and their popups open under
+them.
+
+Changes never need a rebuild. A running app loads and unloads extensions the
+next time you switch to it. Installing a newer version (importing again, or
+adding a file with the same extension name) updates it everywhere and keeps
+each app's settings.
+
+What to expect:
+
+- Each app runs its own copy of each extension, with its own settings and
+  storage. Settings from your browser don't carry over, and setting up an
+  extension in one app doesn't change it in the others.
+- Extensions that need things WebKit doesn't have won't fully work. That
+  includes password managers that talk to their desktop app (native
+  messaging), Chrome sign-in (`identity`), and request blocking with
+  `webRequestBlocking`. Use **uBlock Origin Lite** rather than uBlock Origin.
+- Keyboard shortcuts declared in an extension's manifest, side panels and
+  extension items in the right-click menu aren't supported yet.
+- Apps made from the command line have no ID in the list, so they always use
+  each extension's default.
+
+Extensions are kept with the list, in
+`~/Library/Application Support/WebAppWrap`:
+
+| Path | What it holds |
+| --- | --- |
+| `extensions.json` | Installed extensions, each one's default, and apps that differ from it |
+| `extensions/<id>/<version>/` | Each extension's files. The previous version is kept until the next update |
+
+Each app has an ID in the list, written into its `Info.plist` as
+`WebAppWrapAppID`. That's how it finds its own settings in `extensions.json`.
+
 Choose **Help → WebAppWrap Help**, or click the **?** in the window, for
 a guide to the app and the full command-line reference.
 
@@ -227,11 +285,16 @@ Each tab is a `WKWebView`, and only the selected one is shown in the window.
 Dragging empty space in the strip moves the window. Double-clicking it zooms or
 minimizes the window, following your System Settings.
 
+Extensions are loaded by `ExtensionHost` with `WKWebExtensionController`.
+Tabs and windows adopt `WKWebExtensionTab` and `WKWebExtensionWindow`, so
+extension APIs such as `tabs.query` and `windows.getCurrent` see the app's real
+tabs.
+
 ```
 Sources/
   WebAppWrap/       the generator app (SwiftUI) and its command line
   WebAppWrapRuntime/   the browser shell copied into every generated app (AppKit + WKWebView)
-  WebAppWrapKit/       shared logic: URL normalization, naming, link routing
+  WebAppWrapKit/       shared logic: URL normalization, naming, link routing, the app and extension lists
 Tests/
   WebAppWrapKitTests/
 ```

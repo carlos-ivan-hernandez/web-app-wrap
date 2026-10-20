@@ -22,7 +22,8 @@ public struct LinkPolicy {
     public func destination(for url: URL) -> Destination {
         guard let scheme = url.scheme?.lowercased() else { return .app }
         switch scheme {
-        case "about", "blob", "data", "javascript":
+        case "about", "blob", "data", "javascript", "webkit-extension":
+            // webkit-extension: pages that belong to a browser extension, such as its options.
             return .app
         case "http", "https":
             return isInternalHost(url.host) ? .app : .browser

@@ -4,7 +4,7 @@ import AppKit
 /// the responder chain, so tab actions land on the key tab's BrowserWindowController.
 @MainActor
 enum MainMenu {
-    static func install(appName: String) {
+    static func install(appName: String, extensionsMenuDelegate: NSMenuDelegate) {
         let menuBar = NSMenu()
         let windowMenu = makeWindowMenu()
 
@@ -13,6 +13,10 @@ enum MainMenu {
         menuBar.addItem(submenu("Edit", makeEditMenu()))
         menuBar.addItem(submenu("View", makeViewMenu()))
         menuBar.addItem(submenu("History", makeHistoryMenu()))
+        let extensionsMenu = NSMenu()
+        // Filled in each time it opens.
+        extensionsMenu.delegate = extensionsMenuDelegate
+        menuBar.addItem(submenu("Extensions", extensionsMenu))
         menuBar.addItem(submenu("Developer", makeDeveloperMenu()))
         menuBar.addItem(submenu("Window", windowMenu))
 

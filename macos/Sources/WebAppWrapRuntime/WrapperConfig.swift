@@ -6,6 +6,8 @@ struct WrapperConfig {
     let appName: String
     let baseURL: URL
     let titleBarColor: HexColor
+    /// The app's ID in WebAppWrap's list, for its extension settings. nil for apps made from the command line.
+    let appID: UUID?
 
     var policy: LinkPolicy { LinkPolicy(baseURL: baseURL) }
 
@@ -25,6 +27,7 @@ struct WrapperConfig {
             ?? ProcessInfo.processInfo.processName
         // Apps made before the color setting existed get the default.
         let color = (info[WrapperInfoKeys.titleBarColor] as? String).flatMap(HexColor.init(hex:)) ?? .defaultTitleBar
-        return WrapperConfig(appName: name, baseURL: url, titleBarColor: color)
+        let appID = (info[WrapperInfoKeys.appID] as? String).flatMap(UUID.init(uuidString:))
+        return WrapperConfig(appName: name, baseURL: url, titleBarColor: color, appID: appID)
     }
 }

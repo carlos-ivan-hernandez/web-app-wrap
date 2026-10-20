@@ -17,6 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var config: WrapperConfig!
     let downloads = DownloadManager()
     private var windowControllers: [BrowserWindowController] = []
+    /// An ExtensionHost on macOS 15.4 and later (stored untyped so the app still runs on older systems).
+    private var extensionHostStorage: AnyObject?
+    private lazy var extensionsMenu = ExtensionsMenuController(appDelegate: self)
+
+    @available(macOS 15.4, *)
+    var extensionHost: ExtensionHost? { extensionHostStorage as? ExtensionHost }
 
     /// Last zoom level the user picked; applied to new tabs.
     var pageZoom: CGFloat {
@@ -42,10 +48,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Tabs are drawn by BrowserWindowController, so turn off AppKit's own window tabbing
         // (and the menu items it would add).
         NSWindow.allowsAutomaticWindowTabbing = false
-        MainMenu.install(appName: config.appName)
+        MainMenu.install(appName: config.appName, extensionsMenuDelegate: extensionsMenu)
 
+        if #available(macOS 15.4, *) {
+            let host = ExtensionHost(appDelegate: self)
+            extensionHostStorage = host
+            host.onChange = { [weak self] in self?.extensionsDidChange() }
+            // Load extensions before the first page so their content scripts run on it, but
+            // don't keep the window waiting on a slow one.
+            Task {
+                await host.sync()
+                self.openFirstWindow()
+            }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                self.openFirstWindow()
+            }
+        } else {
+            openFirstWindow()
+        }
+    }
+
+    private var hasOpenedFirstWindow = false
+
+    private func openFirstWindow() {
+        guard !hasOpenedFirstWindow else { return }
+        hasOpenedFirstWindow = true
         openWindow()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Picks up extension changes made in WebAppWrap (or another app) since the last look.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard hasOpenedFirstWindow else { return }
+        if #available(macOS 15.4, *), let host = extensionHost {
+            Task { await host.sync() }
+        }
+    }
+
+    private func extensionsDidChange() {
+        windowControllers.forEach { $0.refreshExtensionToolbar() }
     }
 
     /// Closing the last tab (cmd+W) quits the app.
@@ -66,6 +108,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configuration.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.preferences.isElementFullscreenEnabled = true
+        if #available(macOS 15.4, *), let host = extensionHost {
+            configuration.webExtensionController = host.controller
+        }
         // Adds "Inspect Element" to the right-click menu. There's no public API for this; the
         // key has been stable in WebKit for years, and is skipped if it ever disappears.
         if configuration.preferences.responds(to: NSSelectorFromString("_developerExtrasEnabled")) {
@@ -79,6 +124,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func openWindow(url: URL? = nil) -> BrowserWindowController {
         let controller = BrowserWindowController(appDelegate: self)
         windowControllers.append(controller)
+        if #available(macOS 15.4, *) {
+            extensionHost?.controller.didOpenWindow(controller)
+        }
         if let window = controller.window { positionNewWindow(window) }
         controller.showWindow(nil)
         controller.openTab(url: url ?? config.baseURL)
@@ -103,6 +151,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func windowDidClose(_ controller: BrowserWindowController) {
         windowControllers.removeAll { $0 === controller }
+    }
+
+    /// Open windows, frontmost first.
+    var orderedWindowControllers: [BrowserWindowController] {
+        let ordered = NSApp.orderedWindows.compactMap { $0.windowController as? BrowserWindowController }
+        return ordered.filter { controller in windowControllers.contains { $0 === controller } }
+            + windowControllers.filter { controller in !ordered.contains { $0 === controller } }
+    }
+
+    var frontWindowController: BrowserWindowController? {
+        (NSApp.keyWindow?.windowController as? BrowserWindowController) ?? orderedWindowControllers.first
     }
 
     // MARK: - Actions that work even with no window open
