@@ -105,6 +105,7 @@ struct HelpView: View {
                     .init("--url", "Web address. https:// is added if missing. Required."),
                     .init("--image", "Icon image. Without it, a colored tile with the name’s first letter is drawn."),
                     .init("--zoom", "1–3, on top of the automatic zoom that crops off the image’s border. Default 1."),
+                    .init("--no-auto-zoom", "Use the image as it is, without cropping off its border."),
                     .init("--title-bar-color", "Hex color such as #1a1a1a. Default: the site’s theme color."),
                     .init("--out", "Folder the app (and any folders in its name) go in. Default /Applications."),
                 ],

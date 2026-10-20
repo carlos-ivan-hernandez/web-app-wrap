@@ -33,8 +33,9 @@ cp "$bin_dir/WebAppWrap" "$app/Contents/MacOS/WebAppWrap"
 # The browser shell that gets copied into every app WebAppWrap creates.
 cp "$bin_dir/WebAppWrapRuntime" "$app/Contents/Resources/WebAppWrapRuntime"
 
-# WebAppWrap draws its own icon with the same renderer it uses for generated apps.
-"$app/Contents/MacOS/WebAppWrap" icon --name "WebAppWrap" --symbol macwindow.badge.plus \
+# WebAppWrap's icon is Support/AppIcon.png, drawn with the same renderer it uses for generated
+# apps. The image's dark background is part of the design, so it isn't cropped off.
+"$app/Contents/MacOS/WebAppWrap" icon --name "WebAppWrap" --image Support/AppIcon.png --no-auto-zoom \
   --out "$app/Contents/Resources/AppIcon.icns" >/dev/null
 
 xattr -cr "$app"

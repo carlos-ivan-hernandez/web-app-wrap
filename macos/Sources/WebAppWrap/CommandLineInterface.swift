@@ -8,10 +8,11 @@ enum CommandLineInterface {
       WebAppWrap
           Open the app.
 
-      WebAppWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>]
+      WebAppWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>] [--no-auto-zoom]
                     [--title-bar-color <#RRGGBB>] [--out <folder>]
           Create one app. <name> may include folders, e.g. "WebAppWrap/Photos".
           --zoom adds to the automatic zoom that crops off an image's border.
+          --no-auto-zoom uses the image as it is, border and all.
           The title bar color defaults to the site's theme color.
           --out is the folder apps go in (default /Applications).
 
@@ -21,7 +22,7 @@ enum CommandLineInterface {
           JSONC and JSON5 (comments, trailing commas, unquoted keys) work too.
           Apps built from the command line aren't added to the window's My Apps list.
 
-      WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
+      WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] [--no-auto-zoom] --out <file.icns>
           Write just the icon.
     """
 
@@ -62,9 +63,10 @@ enum CommandLineInterface {
         guard let image = NSImage(contentsOf: url) else {
             throw UsageError(message: "Couldn’t read an image from \(imagePath).")
         }
-        // --zoom is on top of the automatic zoom that crops off any border.
+        // --zoom is on top of the automatic zoom that crops off any border, unless --no-auto-zoom.
         let extra = value("--zoom", in: options).flatMap(Double.init).map { CGFloat($0) } ?? 1
-        let zoom = IconRenderer.automaticZoom(for: image) * min(max(extra, IconSource.userZoomRange.lowerBound), IconSource.userZoomRange.upperBound)
+        let automatic = options.contains("--no-auto-zoom") ? 1 : IconRenderer.automaticZoom(for: image)
+        let zoom = automatic * min(max(extra, IconSource.userZoomRange.lowerBound), IconSource.userZoomRange.upperBound)
         return .image(image, zoom: zoom)
     }
 
