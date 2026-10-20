@@ -1,6 +1,9 @@
 import AppKit
 @preconcurrency import WebKit
 
+// Needs the macOS 15.4 SDK (Xcode 16.3, Swift 6.1). See AppDelegate.
+#if compiler(>=6.1)
+
 // How tabs and windows look to browser extensions. With these, extension APIs such as
 // tabs.query, tabs.update, windows.getCurrent and the activeTab permission work against the
 // app's real tabs and windows. Every method is optional; WebKit fills in the rest.
@@ -175,6 +178,8 @@ extension BrowserWindowController: WKWebExtensionWindow {
     }
 }
 
+#endif
+
 /// An extension's button in the tab bar, with its badge (such as a count of blocked items).
 final class ExtensionToolbarButton: NSButton {
     var onClick: (() -> Void)?
@@ -243,15 +248,20 @@ final class ExtensionsMenuController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         // Items are enabled or disabled here, not by the responder chain.
         menu.autoenablesItems = false
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *), let host = appDelegate.extensionHost {
             addExtensions(from: host, to: menu)
         } else {
             menu.addItem(disabled("Extensions need macOS 15.4 or later"))
         }
+        #else
+        menu.addItem(disabled("This app was built without extension support"))
+        #endif
         menu.addItem(.separator())
         menu.addItem(item("Manage Extensions in WebAppWrap…") { [weak self] in self?.openGenerator() })
     }
 
+    #if compiler(>=6.1)
     @available(macOS 15.4, *)
     private func addExtensions(from host: ExtensionHost, to menu: NSMenu) {
         guard !host.installed.isEmpty else {
@@ -294,6 +304,7 @@ final class ExtensionsMenuController: NSObject, NSMenuDelegate {
             menu.addItem(entry)
         }
     }
+    #endif
 
     private func openGenerator() {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.generatorBundleID) else {

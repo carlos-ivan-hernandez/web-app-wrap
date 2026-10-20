@@ -2,6 +2,9 @@ import AppKit
 @preconcurrency import WebKit
 import WebAppWrapKit
 
+// Needs the macOS 15.4 SDK (Xcode 16.3, Swift 6.1). See AppDelegate.
+#if compiler(>=6.1)
+
 /// Loads the browser extensions installed in WebAppWrap that are on for this app, and acts as
 /// the browser they talk to: it lists windows and tabs, opens new ones, shows toolbar popups
 /// and asks for extra permissions.
@@ -105,7 +108,7 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
     /// to the shared list so WebAppWrap shows it too.
     func setEnabled(_ enabled: Bool, extensionID: String) {
         guard let appID = appDelegate.config.appID else { return }
-        try? store.update(extensionID) { $0.setEnabled(enabled, forApp: appID) }
+        _ = try? store.update(extensionID) { $0.setEnabled(enabled, forApp: appID) }
         Task { await sync() }
     }
 
@@ -290,3 +293,4 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
         onChange?()
     }
 }
+#endif

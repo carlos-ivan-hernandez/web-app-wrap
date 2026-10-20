@@ -62,9 +62,10 @@ Source code and issues: https://github.com/carlos-ivan-hernandez/web-app-wrap
 ## Requirements
 
 - macOS 13 Ventura or later
-- To build: Xcode 16.3 or later, or its command line tools
-  (`xcode-select --install`). The macOS 15.4 SDK they include is needed for
-  extension support.
+- To build: Xcode or the Xcode command line tools (`xcode-select --install`),
+  with Swift 5.9 or later. Extension support needs Xcode 16.3 or later (Swift
+  6.1 and the macOS 15.4 SDK). With an older Xcode, WebAppWrap builds without
+  it, and the apps' Extensions menu says so.
 - Extensions in generated apps need macOS 15.4 or later. On older systems the
   apps work as before, without extensions.
 

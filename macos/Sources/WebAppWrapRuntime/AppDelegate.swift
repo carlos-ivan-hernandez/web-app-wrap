@@ -19,10 +19,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowControllers: [BrowserWindowController] = []
     /// An ExtensionHost on macOS 15.4 and later (stored untyped so the app still runs on older systems).
     private var extensionHostStorage: AnyObject?
-    private lazy var extensionsMenu = ExtensionsMenuController(appDelegate: self)
+    /// Kept here because a menu doesn't retain its delegate.
+    private var extensionsMenu: ExtensionsMenuController?
 
+    // Extension support needs the macOS 15.4 SDK, which comes with Xcode 16.3 and Swift 6.1.
+    // Older Xcode versions build the app without it.
+    #if compiler(>=6.1)
     @available(macOS 15.4, *)
     var extensionHost: ExtensionHost? { extensionHostStorage as? ExtensionHost }
+    #endif
 
     /// Last zoom level the user picked; applied to new tabs.
     var pageZoom: CGFloat {
@@ -48,8 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Tabs are drawn by BrowserWindowController, so turn off AppKit's own window tabbing
         // (and the menu items it would add).
         NSWindow.allowsAutomaticWindowTabbing = false
+        let extensionsMenu = ExtensionsMenuController(appDelegate: self)
+        self.extensionsMenu = extensionsMenu
         MainMenu.install(appName: config.appName, extensionsMenuDelegate: extensionsMenu)
 
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             let host = ExtensionHost(appDelegate: self)
             extensionHostStorage = host
@@ -67,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             openFirstWindow()
         }
+        #else
+        openFirstWindow()
+        #endif
     }
 
     private var hasOpenedFirstWindow = false
@@ -81,9 +92,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Picks up extension changes made in WebAppWrap (or another app) since the last look.
     func applicationDidBecomeActive(_ notification: Notification) {
         guard hasOpenedFirstWindow else { return }
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *), let host = extensionHost {
             Task { await host.sync() }
         }
+        #endif
     }
 
     private func extensionsDidChange() {
@@ -108,9 +121,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configuration.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.preferences.isElementFullscreenEnabled = true
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *), let host = extensionHost {
             configuration.webExtensionController = host.controller
         }
+        #endif
         // Adds "Inspect Element" to the right-click menu. There's no public API for this; the
         // key has been stable in WebKit for years, and is skipped if it ever disappears.
         if configuration.preferences.responds(to: NSSelectorFromString("_developerExtrasEnabled")) {
@@ -124,9 +139,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func openWindow(url: URL? = nil) -> BrowserWindowController {
         let controller = BrowserWindowController(appDelegate: self)
         windowControllers.append(controller)
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             extensionHost?.controller.didOpenWindow(controller)
         }
+        #endif
         if let window = controller.window { positionNewWindow(window) }
         controller.showWindow(nil)
         controller.openTab(url: url ?? config.baseURL)

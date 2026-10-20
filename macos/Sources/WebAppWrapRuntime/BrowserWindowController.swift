@@ -114,9 +114,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         var index = opener.flatMap { tabs.firstIndex(of: $0) }.map { $0 + 1 } ?? tabs.count
         if let requestedIndex, (0...tabs.count).contains(requestedIndex) { index = requestedIndex }
         tabs.insert(tab, at: index)
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             extensionController?.didOpenTab(tab)
         }
+        #endif
 
         if activate || selectedTab == nil {
             select(tab)
@@ -135,9 +137,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             tab.webView.frame = contentContainer.bounds
             contentContainer.addSubview(tab.webView)
             selectedTab = tab
+            #if compiler(>=6.1)
             if #available(macOS 15.4, *) {
                 extensionController?.didActivateTab(tab, previousActiveTab: previous)
             }
+            #endif
             refreshExtensionToolbar()
         }
         window?.makeFirstResponder(tab.webView)
@@ -152,9 +156,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             return
         }
         tabs.remove(at: index)
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             extensionController?.didCloseTab(tab, windowIsClosing: false)
         }
+        #endif
         tab.tearDown()
         if selectedTab === tab {
             selectedTab = nil
@@ -169,9 +175,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         guard tabs.indices.contains(source), tabs.indices.contains(destination), source != destination else { return }
         let tab = tabs.remove(at: source)
         tabs.insert(tab, at: destination)
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             extensionController?.didMoveTab(tab, from: source, in: self)
         }
+        #endif
         refreshStrip()
     }
 
@@ -179,18 +187,22 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if tab === selectedTab {
             window?.title = tab.displayTitle
         }
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *), tabs.contains(tab) {
-            extensionController?.didChangeTabProperties([.title, .loading, .url], for: tab)
+            extensionController?.didChangeTabProperties([.title, .loading, .URL], for: tab)
         }
+        #endif
         refreshStrip()
     }
 
     // MARK: - Extensions
 
+    #if compiler(>=6.1)
     @available(macOS 15.4, *)
     private var extensionController: WKWebExtensionController? {
         appDelegate.extensionHost?.controller
     }
+    #endif
 
     /// The button an extension's popup is shown under.
     func toolbarButton(for extensionID: String) -> NSView? {
@@ -200,6 +212,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// One button per loaded extension that has a toolbar action, showing its icon, label and
     /// badge for the selected tab. Called when extensions load or change, and on tab switches.
     func refreshExtensionToolbar() {
+        #if compiler(>=6.1)
         guard #available(macOS 15.4, *), let host = appDelegate.extensionHost else { return }
         var shown: [ExtensionToolbarButton] = []
         for item in host.loaded {
@@ -228,6 +241,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         extensionToolbar.isHidden = shown.isEmpty
         tabStrip.needsLayout = true
+        #endif
     }
 
     private func refreshStrip() {
@@ -277,9 +291,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowDidResize(_ notification: Notification) { layoutTrafficLights() }
     func windowDidBecomeKey(_ notification: Notification) {
         layoutTrafficLights()
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             extensionController?.didFocusWindow(self)
         }
+        #endif
     }
     func windowDidResignKey(_ notification: Notification) { layoutTrafficLights() }
 
@@ -299,10 +315,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        #if compiler(>=6.1)
         if #available(macOS 15.4, *), let extensionController {
             tabs.forEach { extensionController.didCloseTab($0, windowIsClosing: true) }
             extensionController.didCloseWindow(self)
         }
+        #endif
         tabs.forEach { $0.tearDown() }
         tabs = []
         selectedTab = nil
