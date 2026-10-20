@@ -19,7 +19,7 @@ enum BuildError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .runtimeMissing:
-            "WebAppWrapRuntime is missing from this copy of Web App Wrap. Rebuild it with scripts/build.sh."
+            "WebAppWrapRuntime is missing from this copy of WebAppWrap. Rebuild it with scripts/build.sh."
         case .iconRenderingFailed:
             "The icon couldn’t be drawn."
         case let .commandFailed(command, output):
@@ -31,7 +31,7 @@ enum BuildError: LocalizedError {
 /// Assembles a wrapped app: the prebuilt runtime binary, an Info.plist naming the
 /// web address, and a generated icon, then ad-hoc signs it.
 enum AppBuilder {
-    /// The runtime ships inside Web App Wrap.app/Contents/Resources. When running from
+    /// The runtime ships inside WebAppWrap.app/Contents/Resources. When running from
     /// `swift run`, it sits next to the WebAppWrap executable in the build folder.
     static func runtimeBinaryURL() -> URL? {
         if let bundled = Bundle.main.url(forResource: "WebAppWrapRuntime", withExtension: nil) {
@@ -91,7 +91,7 @@ enum AppBuilder {
 
     static func infoPlist(for spec: AppSpec, executableName: String) -> [String: Any] {
         let name = spec.displayName
-        return [
+        var plist: [String: Any] = [
             "CFBundleDevelopmentRegion": "en",
             "CFBundleDisplayName": name,
             "CFBundleName": name,
@@ -116,6 +116,11 @@ enum AppBuilder {
             WrapperInfoKeys.baseURL: spec.baseURL.absoluteString,
             WrapperInfoKeys.titleBarColor: spec.titleBarColor.hexString,
         ]
+        // Which WebAppWrap built the app.
+        if let commit = GeneratorVersion.commit {
+            plist[WrapperInfoKeys.generatorCommit] = commit
+        }
+        return plist
     }
 }
 

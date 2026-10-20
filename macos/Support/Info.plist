@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Web App Wrap</string>
+	<string>WebAppWrap</string>
 	<key>CFBundleExecutable</key>
 	<string>WebAppWrap</string>
 	<key>CFBundleIconFile</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Web App Wrap</string>
+	<string>WebAppWrap</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -1,7 +1,7 @@
 import AppKit
 import WebAppWrapKit
 
-/// Colors for the tab bar, from the title bar color chosen in Web App Wrap.
+/// Colors for the tab bar, from the title bar color chosen in WebAppWrap.
 struct StripPalette {
     var background: NSColor
     var foreground: NSColor

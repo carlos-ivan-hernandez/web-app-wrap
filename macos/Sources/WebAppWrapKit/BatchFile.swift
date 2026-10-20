@@ -1,10 +1,10 @@
 import Foundation
 
-/// One app in a batch file. The fields mirror the Web App Wrap window:
+/// One app in a batch file. The fields mirror the WebAppWrap window:
 ///
 ///     [
 ///       {
-///         "name": "Web App Wrap/Photos",
+///         "name": "WebAppWrap/Photos",
 ///         "url": "https://kphotos.vercel.app",
 ///         "image": "icons/photos.png",
 ///         "zoom": 1.2,
@@ -23,6 +23,14 @@ public struct BatchEntry: Equatable {
     public let image: URL?
     public let zoom: Double
     public let titleBarColor: HexColor?
+
+    public init(location: AppLocation, url: URL, image: URL?, zoom: Double, titleBarColor: HexColor?) {
+        self.location = location
+        self.url = url
+        self.image = image
+        self.zoom = zoom
+        self.titleBarColor = titleBarColor
+    }
 }
 
 public enum BatchFile {
@@ -108,7 +116,7 @@ public enum BatchFile {
             }
         }
 
-        let destinations = entries.map { $0.location.bundleURL(in: URL(fileURLWithPath: "/")).path.lowercased() }
+        let destinations = entries.map(\.location.key)
         let duplicates = Dictionary(grouping: destinations, by: { $0 }).filter { $0.value.count > 1 }.keys.sorted()
         for duplicate in duplicates {
             problems.append("More than one entry would create \(duplicate.dropFirst()).")

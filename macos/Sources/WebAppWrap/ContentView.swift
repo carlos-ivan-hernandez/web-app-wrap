@@ -1,148 +1,70 @@
 import SwiftUI
 
+/// The main window: make one app now (One-Off), or keep a list of apps and build them (My Apps).
 struct ContentView: View {
     @ObservedObject var model: BuilderModel
-    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Mode", selection: $model.mode) {
+                Text("One-Off").tag(BuilderModel.Mode.oneOff)
+                Text("My Apps").tag(BuilderModel.Mode.list)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .padding(.top, 18)
+
+            switch model.mode {
+            case .oneOff: OneOffView(model: model, draft: model.oneOff)
+            case .list: AppListView(model: model)
+            }
+        }
+        .frame(width: 620)
+    }
+}
+
+/// Fill in the form and create one app. It's added to My Apps too.
+struct OneOffView: View {
+    @ObservedObject var model: BuilderModel
+    @ObservedObject var draft: AppDraft
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top, spacing: 28) {
-                iconColumn
-                fieldsColumn
-            }
+            AppForm(draft: draft) { model.createApp() }
+                .disabled(model.status.isBusy)
             Divider()
-            footer
+            HStack(spacing: 10) {
+                HelpButton()
+                StatusView(model: model)
+                Spacer()
+                Button("Create App") { model.createApp() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!model.canCreateOneOff)
+            }
+            .frame(minHeight: 28)
         }
         .padding(24)
-        .frame(width: 620)
     }
+}
 
-    // MARK: - Icon
+struct HelpButton: View {
+    @Environment(\.openWindow) private var openWindow
 
-    private var iconColumn: some View {
-        VStack(spacing: 10) {
-            Image(nsImage: model.previewImage)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 148, height: 148)
-                .padding(8)
-                .dropDestination(for: URL.self) { urls, _ in
-                    model.loadImage(from: urls.first)
-                }
-                .help("Drop an image here")
-
-            HStack(spacing: 6) {
-                Button("Choose Image…") { model.chooseImage() }
-                if model.customImage != nil {
-                    Button("Use Default") { model.clearImage() }
-                }
-            }
-            .controlSize(.small)
-
-            if model.customImage != nil {
-                HStack(spacing: 6) {
-                    Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
-                    Slider(
-                        value: $model.imageZoom,
-                        in: Double(IconSource.userZoomRange.lowerBound)...Double(IconSource.userZoomRange.upperBound)
-                    )
-                    .controlSize(.small)
-                    Image(systemName: "plus.magnifyingglass").foregroundStyle(.secondary)
-                }
-                .help("Zoom in on the image")
-            }
-
-            Text(model.customImage == nil ? "Default icon. Drop an image to use your own." : model.imageFileName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .truncationMode(.middle)
+    var body: some View {
+        Button { openWindow(id: HelpView.windowID) } label: {
+            Image(systemName: "questionmark.circle")
         }
-        .frame(width: 176)
+        .buttonStyle(.borderless)
+        .help("WebAppWrap Help")
     }
+}
 
-    // MARK: - Fields
+/// Progress and results of the last build, shared by both modes.
+struct StatusView: View {
+    @ObservedObject var model: BuilderModel
 
-    private var fieldsColumn: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            labeled("App name") {
-                TextField("e.g. Linear, or Web App Wrap/Linear", text: $model.displayName)
-                    .textFieldStyle(.roundedBorder)
-                if model.trimmedName.isEmpty {
-                    caption("Shown in the Dock, menu bar and Finder. Add folders with “/”.")
-                } else {
-                    caption("Saves to \(model.destination.path)")
-                }
-            }
-
-            labeled("Web address") {
-                TextField("e.g. linear.app", text: $model.urlString)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { model.createApp() }
-                if model.urlString.trimmingCharacters(in: .whitespaces).isEmpty {
-                    caption("New tabs open here. Links to other sites open in your browser.")
-                } else if let url = model.normalizedURL {
-                    caption("Opens \(url.absoluteString)")
-                } else {
-                    caption("Enter a web address like example.com or https://example.com/app.", color: .red)
-                }
-            }
-
-            labeled("Title bar color") {
-                HStack(spacing: 8) {
-                    ColorPicker(
-                        "Title bar color",
-                        selection: Binding(get: { model.titleBarColor }, set: { model.setTitleBarColor($0) }),
-                        supportsOpacity: false
-                    )
-                    .labelsHidden()
-                    caption(model.titleBarHex.hexString)
-                        .textSelection(.enabled)
-                    switch model.titleBarColorSource {
-                    case .lookingUp:
-                        ProgressView().controlSize(.small)
-                        caption("Checking the site’s theme color…")
-                    case .site:
-                        caption("From the site’s theme color")
-                    case .standard:
-                        caption(model.normalizedURL == nil ? "Default" : "Default (the site has no theme color)")
-                    case .custom:
-                        caption("Custom")
-                        Button("Use Site Color") { model.useSiteThemeColor() }
-                            .buttonStyle(.link)
-                            .font(.caption)
-                    }
-                }
-                caption("Background of the bar holding the window buttons and tabs.")
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Footer
-
-    private var footer: some View {
-        HStack(spacing: 10) {
-            Button { openWindow(id: HelpView.windowID) } label: {
-                Image(systemName: "questionmark.circle")
-            }
-            .buttonStyle(.borderless)
-            .help("Web App Wrap Help")
-            statusView
-            Spacer()
-            Button("Create from JSON…") { model.createAppsFromJSON() }
-                .disabled(model.status.isBusy)
-                .help("Create several apps from a JSON file (⇧⌘O)")
-            Button("Create App") { model.createApp() }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!model.canBuild)
-        }
-        .frame(minHeight: 28)
-    }
-
-    @ViewBuilder
-    private var statusView: some View {
+    var body: some View {
         switch model.status {
         case .idle:
             EmptyView()
@@ -157,14 +79,14 @@ struct ContentView: View {
         case let .failed(message):
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             Text(message).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled)
-        case let .buildingBatch(current, total, name):
+        case let .buildingList(current, total, name):
             ProgressView().controlSize(.small)
             Text("Building \(current) of \(total): \(name)…")
                 .foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-        case let .batchFinished(created, failed):
+        case let .listFinished(created, failed, skipped):
             Image(systemName: failed == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 .foregroundStyle(failed == 0 ? .green : .orange)
-            Text(failed == 0 ? "Created \(created.count) apps" : "Created \(created.count), \(failed) failed")
+            Text(Self.summary(created: created.count, failed: failed, skipped: skipped))
                 .lineLimit(1)
             if !created.isEmpty {
                 Button("Show in Finder") { model.reveal(created) }
@@ -172,16 +94,11 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Helpers
-
-    private func labeled<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.headline)
-            content()
-        }
-    }
-
-    private func caption(_ text: String, color: Color = .secondary) -> Text {
-        Text(text).font(.caption).foregroundColor(color)
+    private static func summary(created: Int, failed: Int, skipped: Int) -> String {
+        if created == 0, failed == 0 { return "All apps are up to date" }
+        var parts = ["Built \(created)"]
+        if failed > 0 { parts.append("\(failed) failed") }
+        if skipped > 0 { parts.append("\(skipped) skipped") }
+        return parts.joined(separator: ", ")
     }
 }

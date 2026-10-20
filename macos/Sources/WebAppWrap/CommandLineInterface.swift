@@ -10,7 +10,7 @@ enum CommandLineInterface {
 
       WebAppWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>]
                     [--title-bar-color <#RRGGBB>] [--out <folder>]
-          Create one app. <name> may include folders, e.g. "Web App Wrap/Photos".
+          Create one app. <name> may include folders, e.g. "WebAppWrap/Photos".
           --zoom adds to the automatic zoom that crops off an image's border.
           The title bar color defaults to the site's theme color.
           --out is the folder apps go in (default /Applications).
@@ -19,6 +19,7 @@ enum CommandLineInterface {
           Create every app listed in a JSON array of objects with the fields
           name, url, image, zoom and titleBarColor (only name and url are required).
           JSONC and JSON5 (comments, trailing commas, unquoted keys) work too.
+          Apps built from the command line aren't added to the window's My Apps list.
 
       WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
           Write just the icon.
@@ -74,7 +75,7 @@ enum CommandLineInterface {
         guard let rawURL = value("--url", in: options), let url = InputNormalizer.normalizeURL(rawURL) else {
             throw UsageError(message: "--url is required and must be a web address.")
         }
-        // --name may include folders, e.g. "Web App Wrap/Photos".
+        // --name may include folders, e.g. "WebAppWrap/Photos".
         let location = AppLocation(name)
         guard !location.name.isEmpty else { throw UsageError(message: "--name needs an app name after any folders.") }
         let root = URL(fileURLWithPath: ((value("--out", in: options) ?? "/Applications") as NSString).expandingTildeInPath)

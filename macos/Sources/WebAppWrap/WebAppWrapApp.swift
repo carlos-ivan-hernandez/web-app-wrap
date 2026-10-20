@@ -17,7 +17,7 @@ struct WebAppWrapApp: App {
     @StateObject private var model = BuilderModel()
 
     var body: some Scene {
-        Window("Web App Wrap", id: "main") {
+        Window("WebAppWrap", id: "main") {
             ContentView(model: model)
         }
         .windowResizability(.contentSize)
@@ -25,14 +25,9 @@ struct WebAppWrapApp: App {
             CommandGroup(replacing: .help) {
                 HelpMenuItem()
             }
-            CommandGroup(after: .newItem) {
-                Button("Create Apps from JSON…") { model.createAppsFromJSON() }
-                    .keyboardShortcut("o", modifiers: [.command, .shift])
-                    .disabled(model.status.isBusy)
-            }
         }
 
-        Window("Web App Wrap Help", id: HelpView.windowID) {
+        Window("WebAppWrap Help", id: HelpView.windowID) {
             HelpView()
         }
         .defaultSize(width: 680, height: 760)
