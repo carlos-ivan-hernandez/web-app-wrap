@@ -19,6 +19,7 @@ public static class Program
           waw batch <file.json> [--desktop] [--out <folder>]
               Create every app listed in a JSON array of objects with the fields
               name, url, image, zoom and titleBarColor (only name and url are required).
+              JSONC and JSON5 (comments, trailing commas, unquoted keys) work too.
 
           waw icon --name <name> [--image <file>] [--zoom <1-3>] --out <file.ico>
               Write just the icon.

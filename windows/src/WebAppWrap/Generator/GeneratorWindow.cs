@@ -431,7 +431,7 @@ internal sealed class GeneratorWindow : Window
     {
         if (_busy) return;
         var picker = new FileOpenPicker();
-        picker.FileTypeFilter.Add(".json");
+        foreach (var extension in BatchFile.Extensions) picker.FileTypeFilter.Add(extension);
         WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
         if (await picker.PickSingleFileAsync() is not { } file) return;
 

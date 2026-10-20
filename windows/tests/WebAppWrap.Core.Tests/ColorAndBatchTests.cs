@@ -143,6 +143,36 @@ public class BatchFileTests
     }
 
     [Fact]
+    public void ReadsJsonc()
+    {
+        var entries = Parse("""
+            // My apps
+            [
+              { "name": "Linear", "url": "linear.app" }, /* work */
+              { "name": "Photos", "url": "kphotos.vercel.app", },
+            ]
+            """);
+        Assert.Equal(["Linear", "Photos"], entries.Select(e => e.Location.Name));
+    }
+
+    [Fact]
+    public void ReadsJson5()
+    {
+        var entry = Assert.Single(Parse("""
+            [{
+              name: 'Web App Wrap/Photos',
+              url: 'kphotos.vercel.app', // single quotes and unquoted keys
+              image: 'icons/\
+            photos.png',
+              zoom: +1.5,
+            }]
+            """));
+        Assert.Equal(new AppLocation("Web App Wrap/Photos"), entry.Location);
+        Assert.Equal(Path.Combine(Base, "icons", "photos.png"), entry.Image);
+        Assert.Equal(1.5, entry.Zoom);
+    }
+
+    [Fact]
     public void RejectsNonArray()
     {
         Assert.Equal("The file must contain a JSON array of app objects.", ErrorMessage("""{"name": "A", "url": "a.com"}"""));

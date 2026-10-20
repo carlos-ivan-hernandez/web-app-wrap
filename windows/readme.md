@@ -147,6 +147,17 @@ The format is the same as on macOS:
 | `zoom` | no | 1–3, applied on top of the automatic zoom that crops off a border. Defaults to 1 |
 | `titleBarColor` | no | For example `"#1a1a1a"`. Defaults to the site's theme color |
 
+The file can also be JSONC or JSON5 (`.jsonc`, `.json5`), so comments, trailing
+commas, unquoted keys and single-quoted strings are fine:
+
+```json5
+// My apps
+[
+  { name: 'Linear', url: 'linear.app' }, // work
+  { name: 'Photos', url: 'kphotos.vercel.app' },
+]
+```
+
 Before building, Web App Wrap checks the whole file and lists every problem at
 once, such as a missing field, a bad color, an unknown field, or two entries
 with the same name. It then shows the apps it's about to create, including any

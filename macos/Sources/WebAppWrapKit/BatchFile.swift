@@ -13,9 +13,10 @@ import Foundation
 ///     ]
 ///
 /// Only `name` and `url` are required. `name` may include folders, as in the window.
-/// `image` is a path, relative to the JSON file unless absolute (`~` works).
+/// `image` is a path, relative to the batch file unless absolute (`~` works).
 /// `zoom` (1–3) is on top of the automatic zoom that crops off a border.
 /// `titleBarColor` defaults to the site's theme color.
+/// The file may be JSON, JSONC or JSON5 (comments, trailing commas, unquoted keys and so on).
 public struct BatchEntry: Equatable {
     public let location: AppLocation
     public let url: URL
@@ -32,10 +33,14 @@ public enum BatchFile {
 
     public static let zoomRange: ClosedRange<Double> = 1...3
 
+    /// File extensions offered when choosing a batch file.
+    public static let fileExtensions = ["json", "jsonc", "json5"]
+
     /// Reads every entry, or fails with one message listing every problem found
     /// (so a batch never half-runs because of a typo in its last entry).
     public static func parse(_ data: Data, baseDirectory: URL) throws -> [BatchEntry] {
-        guard let json = try? JSONSerialization.jsonObject(with: data) else {
+        // JSON5 is a superset of JSONC and JSON, so one reader covers all three.
+        guard let json = try? JSONSerialization.jsonObject(with: data, options: .json5Allowed) else {
             throw ParseError(message: "The file isn’t valid JSON.")
         }
         guard let objects = json as? [Any] else {

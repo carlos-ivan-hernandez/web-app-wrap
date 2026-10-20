@@ -16,7 +16,8 @@ namespace WebAppWrap.Core;
 /// ]
 /// </code>
 /// Only name and url are required. name may include folders, as in the window. image is a path,
-/// relative to the JSON file unless absolute (~ works). zoom (1–3) is on top of the automatic
+/// relative to the batch file unless absolute (~ works).
+/// The file may be JSON, JSONC or JSON5 (comments, trailing commas, unquoted keys and so on). zoom (1–3) is on top of the automatic
 /// zoom that crops off a border. titleBarColor defaults to the site's theme color.
 /// </summary>
 public sealed record BatchEntry(AppLocation Location, Uri Url, string? Image, double Zoom, HexColor? TitleBarColor);
@@ -26,6 +27,9 @@ public sealed class BatchFileException(string message) : Exception(message);
 public static class BatchFile
 {
     public const double MinZoom = 1, MaxZoom = 3;
+
+    /// <summary>File types offered when choosing a batch file.</summary>
+    public static readonly IReadOnlyList<string> Extensions = [".json", ".jsonc", ".json5"];
 
     private static readonly HashSet<string> KnownFields = ["name", "url", "image", "zoom", "titleBarColor"];
 
@@ -38,7 +42,7 @@ public static class BatchFile
         JsonDocument document;
         try
         {
-            document = JsonDocument.Parse(json, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            document = Json5.Parse(json);
         }
         catch (JsonException)
         {

@@ -18,6 +18,7 @@ enum CommandLineInterface {
       WebAppWrap batch <file.json> [--out <folder>]
           Create every app listed in a JSON array of objects with the fields
           name, url, image, zoom and titleBarColor (only name and url are required).
+          JSONC and JSON5 (comments, trailing commas, unquoted keys) work too.
 
       WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] --out <file.icns>
           Write just the icon.

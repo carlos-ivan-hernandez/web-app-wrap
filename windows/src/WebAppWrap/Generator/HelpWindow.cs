@@ -68,7 +68,7 @@ internal sealed class HelpWindow : Window
                     "waw icon --name \"Linear\" --out Linear.ico"),
                 Ui.Paragraph("Run `waw help` to print a summary of these commands.")),
             Section("Batch file format",
-                Ui.Paragraph("A JSON array of objects with the same inputs as the window. Only name and url are required."),
+                Ui.Paragraph("A JSON array of objects with the same inputs as the window. Only name and url are required. JSONC and JSON5 work too, so you can add comments, trailing commas, unquoted keys and single quotes."),
                 Ui.CodeBlock("""
                     [
                       {

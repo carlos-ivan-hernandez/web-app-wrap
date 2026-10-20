@@ -182,7 +182,7 @@ final class BuilderModel: ObservableObject {
     func createAppsFromJSON() {
         guard !status.isBusy else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
+        panel.allowedContentTypes = BatchFile.fileExtensions.compactMap { UTType(filenameExtension: $0) }
         panel.allowsMultipleSelection = false
         panel.message = "Choose a JSON file listing the apps to create."
         panel.prompt = "Choose"

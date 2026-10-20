@@ -47,6 +47,32 @@ final class BatchFileTests: XCTestCase {
         XCTAssertEqual(entries[1].image?.path, "/Users/me/shared/b.png")
     }
 
+    func testReadsJSONC() throws {
+        let entries = try parse(#"""
+        // My apps
+        [
+          {"name": "Linear", "url": "linear.app"}, /* work */
+          {"name": "Photos", "url": "kphotos.vercel.app",},
+        ]
+        """#)
+        XCTAssertEqual(entries.map(\.location.name), ["Linear", "Photos"])
+    }
+
+    func testReadsJSON5() throws {
+        let entry = try parse(#"""
+        [{
+          name: 'Web App Wrap/Photos',
+          url: 'kphotos.vercel.app', // single quotes and unquoted keys
+          zoom: +1.5,
+          titleBarColor: '#1a1a1a',
+        }]
+        """#)[0]
+        XCTAssertEqual(entry.location, AppLocation("Web App Wrap/Photos"))
+        XCTAssertEqual(entry.url.absoluteString, "https://kphotos.vercel.app")
+        XCTAssertEqual(entry.zoom, 1.5)
+        XCTAssertEqual(entry.titleBarColor?.hexString, "#1A1A1A")
+    }
+
     func testRejectsNonArray() {
         XCTAssertEqual(errorMessage(#"{"name": "A", "url": "a.com"}"#), "The file must contain a JSON array of app objects.")
         XCTAssertEqual(errorMessage("not json"), "The file isn’t valid JSON.")

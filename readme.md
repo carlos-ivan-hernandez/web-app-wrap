@@ -11,8 +11,8 @@ sign-ins and storage. Inside the app:
 - Ctrl+W / ⌘W closes the tab.
 - Links to other sites open in your default browser.
 
-Web App Wrap has a window for making apps one at a time, a JSON batch format for
-making many at once, and a command-line tool.
+Web App Wrap has a window for making apps one at a time, a JSON batch format
+(JSONC and JSON5 work too) for making many at once, and a command-line tool.
 
 | Platform | Built with | Folder |
 | --- | --- | --- |

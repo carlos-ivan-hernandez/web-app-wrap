@@ -120,7 +120,7 @@ struct HelpView: View {
 
     private var batchFormat: some View {
         section("Batch file format") {
-            paragraph("A JSON array of objects with the same inputs as the window. Only name and url are required.")
+            paragraph("A JSON array of objects with the same inputs as the window. Only name and url are required. JSONC and JSON5 work too, so you can add comments, trailing commas, unquoted keys and single quotes.")
             code("""
             [
               {
