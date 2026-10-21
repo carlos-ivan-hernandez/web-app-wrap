@@ -185,11 +185,16 @@ final class ExtensionStoreTests: XCTestCase {
         try add("Google/Chrome/Profile 1/Extensions/\(vimium)/2.10.0_0", #"{"manifest_version": 3, "name": "Vimium", "version": "2.10.0"}"#)
         try add("Google/Chrome/Default/Extensions/themeid/1_0", #"{"manifest_version": 3, "name": "Theme", "version": "1", "theme": {}}"#)
         try add("BraveSoftware/Brave-Browser/Default/Extensions/abc/1_0", #"{"manifest_version": 3, "name": "Brave One", "version": "1"}"#)
+        try add("net.imput.helium/Default/Extensions/def/1_0", #"{"manifest_version": 3, "name": "Helium One", "version": "1"}"#)
+        try add("com.operasoftware.Opera/Extensions/ghi/1_0", #"{"manifest_version": 3, "name": "Opera One", "version": "1"}"#)
 
         let found = BrowserExtension.find(applicationSupport: support)
-        XCTAssertEqual(found.map(\.manifest.name), ["Brave One", "Vimium"])
-        XCTAssertEqual(found[1].manifest.version, "2.10.0", "newest version wins")
-        XCTAssertEqual(found[1].browser, "Google Chrome")
-        XCTAssertEqual(found[1].browserID, vimium)
+        XCTAssertEqual(found.map(\.manifest.name), ["Brave One", "Helium One", "Opera One", "Vimium"])
+        XCTAssertEqual(found[1].browser, "Helium")
+        XCTAssertEqual(found[2].browser, "Opera")
+        XCTAssertEqual(found[2].profile, "Default", "Opera's main profile is the browser folder itself")
+        XCTAssertEqual(found[3].manifest.version, "2.10.0", "newest version wins")
+        XCTAssertEqual(found[3].browser, "Google Chrome")
+        XCTAssertEqual(found[3].browserID, vimium)
     }
 }

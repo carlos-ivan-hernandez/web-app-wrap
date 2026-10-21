@@ -167,7 +167,9 @@ macOS 15.4 or later.
 1. Choose **Extensions** at the top of the window.
 2. Click **+**, then either:
    - **Import from Chrome or Another Browser…** lists the extensions installed
-     in Chrome, Chromium, Brave, Edge, Vivaldi and Arc. Pick the ones you want.
+     in Chrome, Chromium, Brave, Edge, Helium, Vivaldi, Arc, Dia, Comet,
+     Opera, Yandex and Thorium (and the beta, dev, canary and nightly
+     versions of Chrome, Brave, Edge and Vivaldi). Pick the ones you want.
    - **Add from File or Folder…** takes an unpacked extension folder (with a
      `manifest.json`), a `.zip` or a `.crx`.
 3. WebAppWrap shows what each extension can access and warns about anything

@@ -172,11 +172,27 @@ public struct BrowserExtension: Equatable, Identifiable {
     /// Where each browser keeps its profiles, under ~/Library/Application Support.
     public static let browsers: [(name: String, path: String)] = [
         ("Google Chrome", "Google/Chrome"),
+        ("Google Chrome Beta", "Google/Chrome Beta"),
+        ("Google Chrome Dev", "Google/Chrome Dev"),
+        ("Google Chrome Canary", "Google/Chrome Canary"),
         ("Chromium", "Chromium"),
         ("Brave", "BraveSoftware/Brave-Browser"),
+        ("Brave Beta", "BraveSoftware/Brave-Browser-Beta"),
+        ("Brave Nightly", "BraveSoftware/Brave-Browser-Nightly"),
         ("Microsoft Edge", "Microsoft Edge"),
+        ("Microsoft Edge Beta", "Microsoft Edge Beta"),
+        ("Microsoft Edge Dev", "Microsoft Edge Dev"),
+        ("Microsoft Edge Canary", "Microsoft Edge Canary"),
+        ("Helium", "net.imput.helium"),
         ("Vivaldi", "Vivaldi"),
+        ("Vivaldi Snapshot", "Vivaldi Snapshot"),
         ("Arc", "Arc/User Data"),
+        ("Dia", "Dia/User Data"),
+        ("Comet", "Comet"),
+        ("Opera", "com.operasoftware.Opera"),
+        ("Opera GX", "com.operasoftware.OperaGX"),
+        ("Yandex", "Yandex/YandexBrowser"),
+        ("Thorium", "Thorium"),
     ]
 
     /// Every extension (not theme) in every profile of every browser, newest version of each,
@@ -192,7 +208,10 @@ public struct BrowserExtension: Equatable, Identifiable {
         var found: [BrowserExtension] = []
         for browser in browsers {
             var seen = Set<String>()
-            for profile in folders(applicationSupport.appendingPathComponent(browser.path, isDirectory: true)) {
+            // Most browsers keep each profile in a subfolder ("Default", "Profile 1"); Opera keeps
+            // its main profile in the browser folder itself.
+            let browserFolder = applicationSupport.appendingPathComponent(browser.path, isDirectory: true)
+            for profile in [browserFolder] + folders(browserFolder) {
                 for extensionFolder in folders(profile.appendingPathComponent("Extensions", isDirectory: true)) {
                     let browserID = extensionFolder.lastPathComponent
                     guard !seen.contains(browserID) else { continue }
@@ -203,7 +222,7 @@ public struct BrowserExtension: Equatable, Identifiable {
                         guard let manifest = try? ExtensionManifest.read(from: version) else { continue }
                         if !manifest.isTheme {
                             found.append(BrowserExtension(
-                                browser: browser.name, profile: profile.lastPathComponent,
+                                browser: browser.name, profile: profile == browserFolder ? "Default" : profile.lastPathComponent,
                                 browserID: browserID, folder: version, manifest: manifest
                             ))
                             seen.insert(browserID)

@@ -102,7 +102,7 @@ struct ExtensionsView: View {
         guard !found.isEmpty else {
             let alert = NSAlert()
             alert.messageText = "No browser extensions found"
-            alert.informativeText = "WebAppWrap looks in Chrome, Chromium, Brave, Edge, Vivaldi and Arc. To install another extension, use Add from File or Folder."
+            alert.informativeText = "WebAppWrap looks in Chrome, Chromium, Brave, Edge, Helium, Vivaldi, Arc, Dia, Comet, Opera, Yandex and Thorium, including their beta and nightly versions. To install another extension, use Add from File or Folder."
             alert.runModal()
             return
         }
