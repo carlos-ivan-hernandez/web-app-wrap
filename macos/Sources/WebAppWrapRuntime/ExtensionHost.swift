@@ -92,16 +92,57 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
             context.baseURL = baseURL
         }
         context.isInspectable = true
-        // Installing in WebAppWrap granted what the extension asks for up front.
+        try controller.load(context)
+        // Granted after loading: loading reads the context's saved state, which can replace
+        // grants made before it. Changing grants on a loaded context also makes WebKit
+        // re-check which content scripts to inject.
+        grantInstallPermissions(for: item, webExtension: webExtension, in: context)
+        restoreOptionalGrants(for: item.id, in: context)
+        for error in webExtension.errors + context.errors {
+            NSLog("WebAppWrap: extension %@: %@", item.name, error.localizedDescription)
+        }
+        return context
+    }
+
+    /// Installing in WebAppWrap granted what the extension asks for up front: its permissions,
+    /// its host permissions and the sites its content scripts run on. WebKit's requested match
+    /// patterns leave out content script matches, and without a grant for a site, scripts like
+    /// Dark Reader's and Vimium's never run there.
+    private func grantInstallPermissions(for item: InstalledExtension, webExtension: WKWebExtension, in context: WKWebExtensionContext) {
         for permission in webExtension.requestedPermissions {
             context.setPermissionStatus(.grantedExplicitly, for: permission)
         }
-        for pattern in webExtension.requestedPermissionMatchPatterns {
+        var patterns = webExtension.requestedPermissionMatchPatterns
+        let manifestHosts = (try? ExtensionManifest.read(from: store.resourceURL(for: item)))?.hostPermissions ?? []
+        for host in manifestHosts {
+            if let pattern = try? WKWebExtension.MatchPattern(string: host) {
+                patterns.insert(pattern)
+            }
+        }
+        for pattern in patterns {
             context.setPermissionStatus(.grantedExplicitly, for: pattern)
         }
-        restoreOptionalGrants(for: item.id, in: context)
-        try controller.load(context)
-        return context
+    }
+
+    /// WebKit's problems with a loaded extension, such as manifest keys it doesn't support.
+    func problems(for id: String) -> [String] {
+        guard let context = context(for: id) else { return [] }
+        return (context.webExtension.errors + context.errors).map(\.localizedDescription)
+    }
+
+    /// Clicks an extension's toolbar button. If the extension has a popup and WebKit doesn't
+    /// ask for it to be shown, it's shown here, so a click is never silently dropped.
+    func performAction(_ context: WKWebExtensionContext, for tab: Tab?, anchor: NSView) {
+        context.performAction(for: tab)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let action = context.action(for: tab), action.presentsPopup,
+                  let popover = action.popupPopover, !popover.isShown, anchor.window != nil
+            else { return }
+            NSLog("WebAppWrap: showing %@'s popup directly", context.webExtension.displayName ?? context.uniqueIdentifier)
+            popover.behavior = .transient
+            popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+        }
     }
 
     /// Turns an extension on or off for this app from the Extensions menu, saving the choice
@@ -277,6 +318,11 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
               let window = appDelegate.frontWindowController,
               let anchor = window.toolbarButton(for: context.uniqueIdentifier)
         else {
+            NSLog("WebAppWrap: no popup or toolbar button to show %@'s popup under", context.uniqueIdentifier)
+            completionHandler(nil)
+            return
+        }
+        guard !popover.isShown else {
             completionHandler(nil)
             return
         }

@@ -228,8 +228,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             button.badgeText = action.badgeText
             button.isEnabled = action.isEnabled
             button.contentTintColor = tabStrip.palette.foreground.withAlphaComponent(0.7)
-            button.onClick = { [weak self] in
-                context.performAction(for: self?.selectedTab)
+            button.onClick = { [weak self, weak button, weak host] in
+                guard let self, let button, let host else { return }
+                host.performAction(context, for: self.selectedTab, anchor: button)
             }
             shown.append(button)
         }

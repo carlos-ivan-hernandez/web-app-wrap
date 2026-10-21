@@ -296,6 +296,16 @@ final class ExtensionsMenuController: NSObject, NSMenuDelegate {
                 if context.optionsPageURL != nil {
                     submenu.addItem(item("Options…") { host.openOptionsPage(context) })
                 }
+                let problems = host.problems(for: installed.id)
+                if !problems.isEmpty {
+                    submenu.addItem(.separator())
+                    submenu.addItem(disabled("Problems reported by WebKit:"))
+                    for problem in problems.prefix(8) {
+                        let entry = disabled(String(problem.prefix(120)))
+                        entry.toolTip = problem
+                        submenu.addItem(entry)
+                    }
+                }
             } else if let failure = host.failures[installed.id] {
                 submenu.addItem(.separator())
                 submenu.addItem(disabled("Couldn’t load: \(failure)"))
