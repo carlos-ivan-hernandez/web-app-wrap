@@ -103,7 +103,7 @@ single app right now, and **My Apps** keeps a list of your apps and builds them.
    window buttons and tabs. After you enter the web address, WebAppWrap fills it in
    with the site's theme color, from its `<meta name="theme-color">` tag or its
    web app manifest. You can pick a different color, and **Use Site Color**
-   switches back. If the site has no theme color, WebAppWrap uses `#1E1E1E`. The text
+   switches back. If the site has no theme color, WebAppWrap uses `#1C1C1C`. The text
    switches between light and dark to stay readable.
 5. Click **Create App**. WebAppWrap saves the app in `/Applications`. If an app with
    that name is already there, WebAppWrap asks before replacing it and moves the old

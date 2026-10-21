@@ -7,7 +7,7 @@ public struct HexColor: Equatable {
     public let blue: Double
 
     /// The title bar color used when none is chosen.
-    public static let defaultTitleBar = HexColor(red: 0x1E / 255, green: 0x1E / 255, blue: 0x1E / 255)
+    public static let defaultTitleBar = HexColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1C / 255)
 
     public init(red: Double, green: Double, blue: Double) {
         self.red = min(max(red, 0), 1)

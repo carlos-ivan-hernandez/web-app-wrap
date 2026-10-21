@@ -10,7 +10,7 @@ public readonly record struct HexColor
     public double Blue { get; }
 
     /// <summary>The title bar color used when none is chosen and the site declares none.</summary>
-    public static readonly HexColor DefaultTitleBar = new(0x1E / 255.0, 0x1E / 255.0, 0x1E / 255.0);
+    public static readonly HexColor DefaultTitleBar = new(0x1C / 255.0, 0x1C / 255.0, 0x1C / 255.0);
 
     public HexColor(double red, double green, double blue)
     {

@@ -109,7 +109,7 @@ every wrapped app, along with its shortcuts and sign-ins.
      manifest.
    - To use a different color, click the color and pick one. **Use Site Color**
      switches back.
-   - If the site has no theme color, Web App Wrap uses `#1E1E1E`.
+   - If the site has no theme color, Web App Wrap uses `#1C1C1C`.
 5. Optionally, tick **Also add a shortcut to the desktop**.
 6. Click **Create App**. If an app with that name already exists, Web App Wrap
    asks before replacing it.
