@@ -219,17 +219,45 @@ private struct BrowserImportSheet: View {
     @ObservedObject var model: BuilderModel
     let found: [BrowserExtension]
     @State private var chosen = Set<String>()
+    /// Browsers turned off in the Browsers menu, one per line. Remembered between imports.
+    @AppStorage("hiddenImportBrowsers") private var hiddenBrowsersText = ""
     @Environment(\.dismiss) private var dismiss
+
+    /// Browsers with extensions to import, in the order WebAppWrap looks in them.
+    private var browsers: [String] {
+        let present = Set(found.map(\.browser))
+        return BrowserExtension.browsers.map(\.name).filter(present.contains)
+    }
+
+    private var hiddenBrowsers: Set<String> {
+        Set(hiddenBrowsersText.split(separator: "\n").map(String.init))
+    }
+
+    private var shown: [BrowserExtension] {
+        let hidden = hiddenBrowsers
+        return found.filter { !hidden.contains($0.browser) }
+    }
+
+    private func setBrowser(_ browser: String, shown isShown: Bool) {
+        var hidden = hiddenBrowsers
+        if isShown { hidden.remove(browser) } else { hidden.insert(browser) }
+        hiddenBrowsersText = hidden.sorted().joined(separator: "\n")
+        if !isShown { chosen = chosen.filter { !$0.hasPrefix(browser + "/") } }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Import Extensions").font(.title2.weight(.semibold))
+            HStack(alignment: .firstTextBaseline) {
+                Text("Import Extensions").font(.title2.weight(.semibold))
+                Spacer()
+                browserMenu
+            }
             Text("Extensions installed in your browsers. Each app gets its own copy of an extension’s settings, so settings from your browser don’t carry over.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             List {
-                ForEach(found) { item in
+                ForEach(shown) { item in
                     Toggle(isOn: Binding(
                         get: { chosen.contains(item.id) },
                         set: { if $0 { chosen.insert(item.id) } else { chosen.remove(item.id) } }
@@ -253,12 +281,18 @@ private struct BrowserImportSheet: View {
                 }
             }
             .frame(height: 320)
+            .overlay {
+                if shown.isEmpty {
+                    Text("All browsers are turned off. Choose some from the Browsers menu.")
+                        .foregroundStyle(.secondary)
+                }
+            }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(chosen.count > 1 ? "Import \(chosen.count)" : "Import") {
-                    let items = found.filter { chosen.contains($0.id) }
+                    let items = shown.filter { chosen.contains($0.id) }
                     dismiss()
                     // After the sheet closes, so the confirmation isn't stacked on top of it.
                     DispatchQueue.main.async { model.importBrowserExtensions(items) }
@@ -269,5 +303,25 @@ private struct BrowserImportSheet: View {
         }
         .padding(24)
         .frame(width: 520)
+    }
+
+    /// Turns each browser's extensions on or off in the list.
+    private var browserMenu: some View {
+        let hidden = hiddenBrowsers
+        let label = hidden.isDisjoint(with: browsers)
+            ? "All Browsers"
+            : "\(browsers.filter { !hidden.contains($0) }.count) of \(browsers.count) Browsers"
+        return Menu(label) {
+            ForEach(browsers, id: \.self) { browser in
+                Toggle("\(browser) (\(found.filter { $0.browser == browser }.count))", isOn: Binding(
+                    get: { !hiddenBrowsers.contains(browser) },
+                    set: { setBrowser(browser, shown: $0) }
+                ))
+            }
+            Divider()
+            Button("Show All") { browsers.forEach { setBrowser($0, shown: true) } }
+        }
+        .fixedSize()
+        .help("Choose which browsers’ extensions are listed")
     }
 }

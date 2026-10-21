@@ -200,35 +200,56 @@ final class BuilderModel: ObservableObject {
 
     // MARK: - Building the list
 
-    /// Builds the apps in the list that changed, were built by another version of WebAppWrap,
-    /// or are missing. Up-to-date apps are skipped. With `only`, builds just those apps, even
-    /// if they're up to date.
-    func buildList(only ids: Set<UUID>? = nil) {
+    /// What Build Apps is about to do, shown on its own page before anything is built.
+    struct BuildPlan {
+        let targets: [AppRecord]
+        /// Up-to-date apps left out. Always 0 when building chosen apps.
+        let skipped: Int
+        /// Why each target is built, as of when the page opened. Missing for up-to-date apps
+        /// built by choice.
+        let reasons: [UUID: AppRecord.BuildReason]
+        /// Targets already in Applications, which are moved to the Trash first.
+        let replacing: Set<UUID>
+        /// How each target went, filled in as the build runs.
+        var outcomes: [UUID: Outcome] = [:]
+        var isFinished = false
+
+        enum Outcome {
+            case built(URL)
+            case failed(String)
+        }
+    }
+
+    /// The Build Apps page, while it's open.
+    @Published var buildPlan: BuildPlan?
+
+    /// Opens the Build Apps page for the apps in the list that changed, were built by another
+    /// version of WebAppWrap, or are missing. Up-to-date apps are skipped. With `only`, it's
+    /// just those apps, even if they're up to date. Nothing is built until `startBuild()`.
+    func reviewBuild(only ids: Set<UUID>? = nil) {
         guard !status.isBusy, loadError == nil else { return }
         let candidates = ids.map { ids in records.filter { ids.contains($0.id) } } ?? records
         let targets = ids == nil ? candidates.filter { buildReason(for: $0) != nil } : candidates
-        let skipped = records.count - targets.count
-        guard !targets.isEmpty else {
-            status = .listFinished(created: [], failed: 0, skipped: skipped)
-            return
-        }
+        guard !targets.isEmpty else { return }
+        var reasons: [UUID: AppRecord.BuildReason] = [:]
+        for record in targets { reasons[record.id] = buildReason(for: record) }
+        let replacing = Set(targets.filter { FileManager.default.fileExists(atPath: appURL(for: $0).path) }.map(\.id))
+        buildPlan = BuildPlan(
+            targets: targets, skipped: ids == nil ? records.count - targets.count : 0,
+            reasons: reasons, replacing: replacing
+        )
+    }
 
-        let alert = NSAlert()
-        alert.messageText = "Build \(targets.count) app\(targets.count == 1 ? "" : "s")?"
-        var details = targets.prefix(12).map { record in
-            let reason = buildReason(for: record).map { " (\($0.description.lowercased()))" } ?? ""
-            return record.settings.name + reason
-        }.joined(separator: "\n")
-        if targets.count > 12 { details += "\n…and \(targets.count - 12) more" }
-        if ids == nil, skipped > 0 {
-            details += "\n\n\(skipped) app\(skipped == 1 ? " is" : "s are") up to date and will be skipped."
-        }
-        details += "\n\nApps that already exist are moved to the Trash first. Their sign-ins and settings are kept."
-        alert.informativeText = details
-        alert.addButton(withTitle: "Build")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+    /// Leaves the Build Apps page. Not while it's building.
+    func closeBuild() {
+        guard !status.isBusy else { return }
+        buildPlan = nil
+    }
 
+    /// Builds the apps on the Build Apps page.
+    func startBuild() {
+        guard !status.isBusy, loadError == nil, let plan = buildPlan, !plan.isFinished else { return }
+        let targets = plan.targets
         let iconsFolder = registry.iconsFolder
         let jobs = targets.compactMap { record in record.batchEntry(iconsFolder: iconsFolder).map { (record, $0) } }
         let root = AppDraft.applicationsFolder
@@ -243,37 +264,45 @@ final class BuilderModel: ObservableObject {
                 }
             }.value
 
+            var outcomes: [UUID: BuildPlan.Outcome] = [:]
             var created: [URL] = []
-            var failures: [String] = []
+            var failed = 0
             var updated = records
             for ((record, _), result) in zip(jobs, results) {
                 switch result.outcome {
                 case let .success(app):
                     created.append(app)
+                    outcomes[record.id] = .built(app)
                     if let index = updated.firstIndex(where: { $0.id == record.id }) {
                         updated[index].lastBuild = BuildStamp(version: version, date: Date(), settings: record.settings)
                     }
                 case let .failure(error):
-                    failures.append("\(record.settings.name): \(error.localizedDescription)")
+                    failed += 1
+                    outcomes[record.id] = .failed(error.localizedDescription)
                 }
             }
             // An entry whose web address no longer parses never reaches the builder.
             for record in targets where !jobs.contains(where: { $0.0.id == record.id }) {
-                failures.append("\(record.settings.name): “\(record.settings.url)” isn’t a web address.")
+                failed += 1
+                outcomes[record.id] = .failed("“\(record.settings.url)” isn’t a web address.")
             }
+            var saveError: String?
             do {
                 try registry.save(updated)
                 records = updated
             } catch {
-                failures.append("The list couldn’t be saved: \(error.localizedDescription)")
+                failed += 1
+                saveError = "The list couldn’t be saved: \(error.localizedDescription)"
             }
-            status = .listFinished(created: created, failed: failures.count, skipped: ids == nil ? skipped : 0)
+            status = .listFinished(created: created, failed: failed, skipped: plan.skipped)
+            buildPlan?.outcomes = outcomes
+            buildPlan?.isFinished = true
 
-            if !failures.isEmpty {
+            if let saveError {
                 let report = NSAlert()
                 report.alertStyle = .warning
-                report.messageText = "Some apps couldn’t be built"
-                report.informativeText = failures.joined(separator: "\n")
+                report.messageText = "Your list of apps couldn’t be saved"
+                report.informativeText = saveError
                 report.runModal()
             }
         }

@@ -126,7 +126,11 @@ apps in it.
 - Double-click an app, or select it and click **Edit…**, to change it.
 - **−** (or Delete) takes an app off the list. The app itself stays installed.
 - Right-click an app to build just that one, open it, or show it in Finder.
-- **Build Apps** builds every app that needs it and skips the rest.
+- **Build Apps** opens a page listing every app that needs building, why
+  (for example, its settings changed), and whether it creates a new app or
+  replaces one in Applications. Nothing is built until you click **Build**
+  there; **Back** returns to the list. Each app's progress and result show on
+  the same page, and **Done** returns to the list.
 
 An app is **skipped** when both of these are true:
 
@@ -170,6 +174,8 @@ macOS 15.4 or later.
      in Chrome, Chromium, Brave, Edge, Helium, Vivaldi, Arc, Dia, Comet,
      Opera, Yandex and Thorium (and the beta, dev, canary and nightly
      versions of Chrome, Brave, Edge and Vivaldi). Pick the ones you want.
+     The **Browsers** menu at the top chooses which browsers' extensions are
+     listed, and WebAppWrap remembers your choice.
    - **Add from File or Folder…** takes an unpacked extension folder (with a
      `manifest.json`), a `.zip` or a `.crx`.
 3. WebAppWrap shows what each extension can access and warns about anything

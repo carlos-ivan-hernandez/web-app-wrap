@@ -70,7 +70,8 @@ struct HelpView: View {
             ])
             paragraph("""
             **My Apps** lists every app made in this window, including one-offs. Add apps with **+**, \
-            double-click one to change it, then click **Build Apps**. An app is skipped when nothing about \
+            double-click one to change it, then click **Build Apps** to see what will be built and why, \
+            and click **Build** there to start. An app is skipped when nothing about \
             it changed and it was built by this version of WebAppWrap (\(GeneratorVersion.display)), so \
             after updating WebAppWrap, Build Apps rebuilds them all.
             """)
@@ -80,7 +81,8 @@ struct HelpView: View {
             """)
             paragraph("""
             **Extensions** installs browser extensions once for every app: import them from Chrome \
-            (or Brave, Edge, Helium, Vivaldi, Arc, Opera and other Chromium browsers), or add an unpacked folder, .zip or .crx. Each extension is \
+            (or Brave, Edge, Helium, Vivaldi, Arc, Opera and other Chromium browsers; the Browsers \
+            menu chooses which are listed), or add an unpacked folder, .zip or .crx. Each extension is \
             on for all apps until you change it, by double-clicking it or in an app’s Edit sheet. \
             Apps pick up changes when you switch to them, with no rebuild, and have an Extensions menu \
             of their own. Extensions need macOS 15.4 or later.

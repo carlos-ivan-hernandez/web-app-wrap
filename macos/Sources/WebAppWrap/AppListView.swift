@@ -23,6 +23,14 @@ struct AppListView: View {
     }
 
     var body: some View {
+        if let plan = model.buildPlan {
+            BuildReviewView(model: model, plan: plan)
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let error = model.loadError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -40,7 +48,7 @@ struct AppListView: View {
             .contextMenu(forSelectionType: UUID.self) { ids in
                 if let id = ids.first {
                     Button("Edit…") { edit(id) }
-                    Button("Build Now") { model.buildList(only: [id]) }
+                    Button("Build…") { model.reviewBuild(only: [id]) }
                         .disabled(model.status.isBusy)
                     if let record = model.findRecord(id) {
                         let app = model.appURL(for: record)
@@ -86,12 +94,12 @@ struct AppListView: View {
                 HelpButton()
                 StatusView(model: model)
                 Spacer()
-                Button(pendingCount == 0 ? "Build Apps" : "Build \(pendingCount) App\(pendingCount == 1 ? "" : "s")") {
-                    model.buildList()
+                Button(pendingCount == 0 ? "Build Apps" : "Build \(pendingCount) App\(pendingCount == 1 ? "" : "s")…") {
+                    model.reviewBuild()
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(pendingCount == 0 || model.status.isBusy || model.loadError != nil)
-                .help("Builds apps that changed, were built by another version of WebAppWrap, or are missing. Up-to-date apps are skipped.")
+                .help("Shows the apps that changed, were built by another version of WebAppWrap, or are missing, then builds them. Up-to-date apps are skipped.")
             }
             .frame(minHeight: 28)
         }
