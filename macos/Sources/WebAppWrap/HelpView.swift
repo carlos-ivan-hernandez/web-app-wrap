@@ -55,7 +55,7 @@ struct HelpView: View {
                 "Drag tabs to reorder them. Tabs appear once two or more are open.",
                 "Links to other websites open in your default browser.",
                 "The ⋮ button at the right of the title bar opens a link you paste (⇧⌘L), for example one copied from Chrome, and lists recently visited pages. ⌘Y shows the app’s full history.",
-                "Only the app’s own site opens inside it, plus any sites you add in ⋮ → Allowed Sites. Links to other sites open in your browser, and Open Link won’t open them.",
+                "Only the app’s own site opens inside it, plus any sites you add in ⋮ → Allowed Sites. Links to other sites open in your browser, and Open Link won’t open them. Turn on ⋮ → Allow All Sites to open every link in the app for a while; the sites you visit are listed in Allowed Sites so you can save them.",
                 "Extensions sit in a menu behind the grid button next to it, rather than as a row of buttons.",
                 "⌥⌘I opens Web Inspector for debugging.",
             ])

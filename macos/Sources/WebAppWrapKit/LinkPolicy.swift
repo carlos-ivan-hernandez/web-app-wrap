@@ -2,14 +2,16 @@ import Foundation
 
 /// Decides whether a URL belongs to the wrapped web app or should go to the browser.
 /// The app's own site is the base URL's host; `allowedDomains` adds other sites the user
-/// allowed (each with its subdomains).
+/// allowed (each with its subdomains). With `allowsAllSites`, every web page stays in the app.
 public struct LinkPolicy {
     public let baseURL: URL
+    public let allowsAllSites: Bool
     private let baseHost: String
     private let allowedHosts: [String]
 
-    public init(baseURL: URL, allowedDomains: [String] = []) {
+    public init(baseURL: URL, allowedDomains: [String] = [], allowsAllSites: Bool = false) {
         self.baseURL = baseURL
+        self.allowsAllSites = allowsAllSites
         self.baseHost = Self.canonicalHost(baseURL.host ?? "")
         self.allowedHosts = allowedDomains.compactMap(Self.normalizeDomain)
     }
@@ -43,10 +45,16 @@ public struct LinkPolicy {
             // webkit-extension: pages that belong to a browser extension, such as its options.
             return .app
         case "http", "https":
-            return isInternalHost(url.host) ? .app : .browser
+            return allowsAllSites || isInternalHost(url.host) ? .app : .browser
         default:
             return .system
         }
+    }
+
+    /// Whether the URL is on the app's own site or an allowed one, ignoring `allowsAllSites`.
+    /// Pages for which this is false were only opened because all sites were allowed.
+    public func isListed(_ url: URL) -> Bool {
+        isInternalHost(url.host)
     }
 
     public func isInternal(_ url: URL) -> Bool {

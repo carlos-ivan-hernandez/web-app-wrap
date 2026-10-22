@@ -102,6 +102,9 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     private func recordVisit() {
         guard let url = webView.url, policy.isInternal(url) else { return }
         appDelegate.history.recordVisit(url: url, title: webView.title)
+        if policy.allowsAllSites, !policy.isListed(url) {
+            appDelegate.allowedSites.noteVisited(url)
+        }
     }
 
     private func historyTitleDidChange() {

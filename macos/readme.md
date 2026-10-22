@@ -37,6 +37,12 @@ The **⋮** menu has:
   Type a domain (`github.com`) or paste a link and click **Add**; select one and
   press Delete to remove it. Each app has its own list, and changes apply to
   open tabs straight away.
+- **Allow All Sites**: a switch (also at the top of the Allowed Sites window).
+  While it's on, every web link opens in the app, including clicked links and
+  Open Link. Each site you visit that isn't on the list is listed under
+  **Visited while allowing all sites** in the Allowed Sites window, where you can
+  **Save** it to the list or dismiss it. The switch stays on until you turn it
+  off, even across restarts.
 - **Copy Page Link** and **Open Page in Browser**.
 
 History only lists pages on the app's own and allowed sites, so pages you

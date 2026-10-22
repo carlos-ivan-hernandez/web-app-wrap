@@ -59,4 +59,13 @@ final class LinkPolicyTests: XCTestCase {
         XCTAssertNil(LinkPolicy.normalizeDomain(""))
         XCTAssertEqual(LinkPolicy.domain(of: URL(string: "https://www.figma.com/file")!), "figma.com")
     }
+
+    func testAllowAllSites() {
+        let open = LinkPolicy(baseURL: URL(string: "https://app.example.com")!, allowedDomains: ["github.com"], allowsAllSites: true)
+        XCTAssertEqual(open.destination(for: URL(string: "https://gitlab.com/x")!), .app)
+        XCTAssertEqual(open.destination(for: URL(string: "mailto:a@b.com")!), .system)
+        XCTAssertFalse(open.isListed(URL(string: "https://gitlab.com/x")!))
+        XCTAssertTrue(open.isListed(URL(string: "https://gist.github.com")!))
+        XCTAssertTrue(open.isListed(URL(string: "https://app.example.com/home")!))
+    }
 }

@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Which links stay in the app: its own site and the allowed sites, as they are now.
     var linkPolicy: LinkPolicy {
-        LinkPolicy(baseURL: config.baseURL, allowedDomains: allowedSites.domains)
+        LinkPolicy(baseURL: config.baseURL, allowedDomains: allowedSites.domains, allowsAllSites: allowedSites.allowsAll)
     }
 
     /// The app's own site, for messages: "linear.app".
@@ -229,6 +229,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         historyWindow?.showWindow(nil)
+    }
+
+    /// Turns Allow All Sites on or off (⋮ menu).
+    @objc func toggleAllowAllSites(_ sender: Any?) {
+        allowedSites.allowsAll.toggle()
     }
 
     /// The Allowed Sites window.

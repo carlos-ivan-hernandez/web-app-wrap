@@ -47,6 +47,8 @@ have them yet:
       count as part of the app, for clicked links, Open Link and history. Open
       Link refuses other sites and offers to allow them. See
       `LinkPolicy.allowedDomains` and `WebAppWrapRuntime/AllowedSites.swift`.
+      Include the **Allow All Sites** switch and the list of sites visited
+      while it's on, which can be saved to the list.
 - [ ] **Apps folder setting.** Let the user pick the folder apps are saved in
       (default: today's install folder), offer to move already-built apps when
       it changes, and use it as `waw`'s default `--out`.

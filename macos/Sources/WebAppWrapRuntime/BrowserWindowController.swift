@@ -282,6 +282,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         let historyItem = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
         historyItem.submenu = makeHistoryMenu()
         menu.addItem(historyItem)
+        let allowAll = menuItem("Allow All Sites", #selector(AppDelegate.toggleAllowAllSites(_:)), "")
+        allowAll.state = appDelegate.allowedSites.allowsAll ? .on : .off
+        allowAll.toolTip = "While on, every link opens in this app. Sites you visit are listed in Allowed Sites so you can save them."
+        menu.addItem(allowAll)
         menu.addItem(menuItem("Allowed Sites…", #selector(AppDelegate.showAllowedSites(_:)), ""))
         menu.addItem(.separator())
         menu.addItem(menuItem("Copy Page Link", #selector(copyPageURL(_:)), "c", [.command, .shift]))
