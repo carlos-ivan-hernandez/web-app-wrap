@@ -43,7 +43,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         // macOS otherwise treats the whole top of the window as a drag handle, which swallows
-        // tab drags. TabStripView moves the window itself when its background is dragged.
+        // tab drags. TabStripView starts a native window drag (with tiling) from its background.
         window.isMovable = false
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false

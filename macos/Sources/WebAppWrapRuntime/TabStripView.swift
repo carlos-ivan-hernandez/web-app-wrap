@@ -236,25 +236,11 @@ final class TabStripView: NSView {
             default: window?.performZoom(nil)
             }
         } else {
-            dragWindow()
-        }
-    }
-
-    /// Moves the window with the mouse until the button is released. Done by hand because the
-    /// window is not movable (see BrowserWindowController), which keeps tabs from dragging it.
-    private func dragWindow() {
-        guard let window else { return }
-        let startMouse = NSEvent.mouseLocation
-        let startOrigin = window.frame.origin
-
-        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]), next.type == .leftMouseDragged {
-            let mouse = NSEvent.mouseLocation
-            var origin = NSPoint(x: startOrigin.x + mouse.x - startMouse.x, y: startOrigin.y + mouse.y - startMouse.y)
-            // Like a normal window, don't let the bar slide up under the menu bar.
-            if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? window.screen {
-                origin.y = min(origin.y, screen.visibleFrame.maxY - window.frame.height)
-            }
-            window.setFrameOrigin(origin)
+            // Hand the drag to macOS, so the window tiles when dragged to a screen edge or onto
+            // another window, moves between Spaces and displays, and stays below the menu bar,
+            // like any title bar. Only the background gets here: tabs and buttons handle their own
+            // presses, and the window isn't otherwise movable (see BrowserWindowController).
+            window?.performDrag(with: event)
         }
     }
 }

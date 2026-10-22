@@ -373,7 +373,8 @@ app, WebAppWrap does the following:
 Each window hides its title bar and draws its own tab strip in that space. It
 moves the close, minimize and zoom buttons down so they're centered in the strip.
 Each tab is a `WKWebView`, and only the selected one is shown in the window.
-Dragging empty space in the strip moves the window. Double-clicking it zooms or
+Dragging empty space in the strip moves the window like any title bar, including
+tiling it when you drag it to a screen edge. Double-clicking it zooms or
 minimizes the window, following your System Settings.
 
 Extensions are loaded by `ExtensionHost` with `WKWebExtensionController`.
