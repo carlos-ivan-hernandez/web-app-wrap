@@ -19,6 +19,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Pages visited in this app, shown in the More menu and the History window.
     let history = HistoryController()
     private var historyWindow: HistoryWindowController?
+    /// Sites besides the app's own that it may open (the ⋮ menu's Allowed Sites).
+    let allowedSites = AllowedSites()
+    private var allowedSitesWindow: AllowedSitesWindowController?
+
+    /// Which links stay in the app: its own site and the allowed sites, as they are now.
+    var linkPolicy: LinkPolicy {
+        LinkPolicy(baseURL: config.baseURL, allowedDomains: allowedSites.domains)
+    }
+
+    /// The app's own site, for messages: "linear.app".
+    var ownSite: String {
+        LinkPolicy.domain(of: config.baseURL) ?? config.baseURL.absoluteString
+    }
     private var windowControllers: [BrowserWindowController] = []
     /// An ExtensionHost on macOS 15.4 and later (stored untyped so the app still runs on older systems).
     private var extensionHostStorage: AnyObject?
@@ -203,6 +216,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if historyWindow == nil {
             historyWindow = HistoryWindowController(history: history, appName: config.appName) { [weak self] url in
                 guard let self else { return }
+                guard self.linkPolicy.isInternal(url) else {
+                    self.explainBlocked(url)
+                    return
+                }
                 if let controller = self.frontWindowController {
                     controller.openTab(url: url)
                     controller.showWindow(nil)
@@ -212,5 +229,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         historyWindow?.showWindow(nil)
+    }
+
+    /// The Allowed Sites window.
+    @objc func showAllowedSites(_ sender: Any?) {
+        if allowedSitesWindow == nil {
+            allowedSitesWindow = AllowedSitesWindowController(sites: allowedSites, appName: config.appName, ownSite: ownSite)
+        }
+        allowedSitesWindow?.showWindow(nil)
+    }
+
+    /// Says why a page from the history can't be opened.
+    private func explainBlocked(_ url: URL) {
+        let alert = NSAlert()
+        alert.messageText = "\(LinkPolicy.domain(of: url) ?? "This site") isn’t allowed in \(config.appName)"
+        alert.informativeText = "To open it here, add it to Allowed Sites in the ⋮ menu."
+        alert.runModal()
     }
 }

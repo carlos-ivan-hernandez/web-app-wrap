@@ -9,8 +9,6 @@ struct WrapperConfig {
     /// The app's ID in WebAppWrap's list, for its extension settings. nil for apps made from the command line.
     let appID: UUID?
 
-    var policy: LinkPolicy { LinkPolicy(baseURL: baseURL) }
-
     /// `--url <address>` overrides the Info.plist value, which is handy when running
     /// the bare runtime binary during development (`swift run WebAppWrapRuntime --url ...`).
     static func load(bundle: Bundle = .main, arguments: [String] = CommandLine.arguments) -> WrapperConfig? {

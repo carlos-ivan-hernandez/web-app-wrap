@@ -10,7 +10,8 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     let webView: WKWebView
     weak var host: BrowserWindowController?
     private unowned let appDelegate: AppDelegate
-    private let policy: LinkPolicy
+    /// Read fresh each time, so changes to Allowed Sites apply to open tabs.
+    private var policy: LinkPolicy { appDelegate.linkPolicy }
     private var observations: [NSKeyValueObservation] = []
     private var lastFailedURL: URL?
 
@@ -18,9 +19,8 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// tabs, and is closed if its only job turned out to be a download or a browser hand-off.
     private var isFresh: Bool { webView.backForwardList.currentItem == nil }
 
-    init(appDelegate: AppDelegate, policy: LinkPolicy, configuration: WKWebViewConfiguration) {
+    init(appDelegate: AppDelegate, configuration: WKWebViewConfiguration) {
         self.appDelegate = appDelegate
-        self.policy = policy
         self.webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1024, height: 768), configuration: configuration)
         super.init()
 
@@ -95,7 +95,13 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// nothing is loading is a single-page app moving to another page, so it's a visit too.
     private func urlDidChange() {
         guard !webView.isLoading else { return }
-        appDelegate.history.recordVisit(url: webView.url, title: webView.title)
+        recordVisit()
+    }
+
+    /// Only pages on the app's own or allowed sites are kept, not sign-in pages on others.
+    private func recordVisit() {
+        guard let url = webView.url, policy.isInternal(url) else { return }
+        appDelegate.history.recordVisit(url: url, title: webView.title)
     }
 
     private func historyTitleDidChange() {
@@ -222,7 +228,7 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     // MARK: - Load results
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        appDelegate.history.recordVisit(url: webView.url, title: webView.title)
+        recordVisit()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

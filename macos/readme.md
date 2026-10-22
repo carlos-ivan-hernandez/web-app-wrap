@@ -25,16 +25,23 @@ The **⋮** menu has:
 
 - **Open Link…** (⇧⌘L): paste a link, for example one copied from Chrome, and
   open it in a new tab or the current one. The field starts with the link on
-  the clipboard, if there is one. The link opens in the app even if it's on
-  another site.
+  the clipboard, if there is one. Only links on the app's own site or an
+  allowed site open. For any other link, the app says so and offers to add its
+  site to Allowed Sites.
 - **History**: the 15 most recently visited pages (choose one to open it in the
   current tab, or ⌘-choose for a new tab), and **Show All History** (⌘Y), a
   searchable window of every visit grouped by day. Double-click a page there to
   open it in a new tab; right-click to copy or remove it. **Clear History…**
   removes them all without signing you out.
+- **Allowed Sites…**: other sites the app may open, each with its subdomains.
+  Type a domain (`github.com`) or paste a link and click **Add**; select one and
+  press Delete to remove it. Each app has its own list, and changes apply to
+  open tabs straight away.
 - **Copy Page Link** and **Open Page in Browser**.
 
-Each app keeps its own history, up to 5,000 visits, in
+History only lists pages on the app's own and allowed sites, so pages you
+pass through while signing in elsewhere aren't kept. Each app keeps its own
+history, up to 5,000 visits, in
 `~/Library/Application Support/<bundle ID>/history.json`.
 
 | Action | Result |
@@ -62,7 +69,8 @@ Each app keeps its own history, up to 5,000 visits, in
 ### Which links stay in the app
 
 - **In the app:** the base URL's host and its subdomains (`www.` is ignored).
-  With a base of `app.example.com`, `eu.app.example.com` also counts.
+  With a base of `app.example.com`, `eu.app.example.com` also counts. So do the
+  sites in **⋮ → Allowed Sites** and their subdomains.
 - **In your default browser:** any clicked link to a different host.
 - **In the app that handles the link:** `mailto:`, `tel:`, `zoommtg:` and other
   non-web links.

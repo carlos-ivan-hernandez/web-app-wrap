@@ -43,6 +43,10 @@ have them yet:
       current tab), a **History** submenu of recent pages, **Show All History**
       (Ctrl+H) and the page commands. Keep each app's history in its own
       `history.json`, in the same format as macOS (`BrowsingHistory.swift`).
+- [ ] **Allowed Sites** in the ⋮ menu: other domains (with subdomains) that
+      count as part of the app, for clicked links, Open Link and history. Open
+      Link refuses other sites and offers to allow them. See
+      `LinkPolicy.allowedDomains` and `WebAppWrapRuntime/AllowedSites.swift`.
 - [ ] **Apps folder setting.** Let the user pick the folder apps are saved in
       (default: today's install folder), offer to move already-built apps when
       it changes, and use it as `waw`'s default `--out`.

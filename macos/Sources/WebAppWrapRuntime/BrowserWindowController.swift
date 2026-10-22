@@ -114,7 +114,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     ) -> Tab {
         let tab = Tab(
             appDelegate: appDelegate,
-            policy: appDelegate.config.policy,
             configuration: configuration ?? appDelegate.makeWebViewConfiguration()
         )
         tab.host = self
@@ -283,6 +282,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         let historyItem = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
         historyItem.submenu = makeHistoryMenu()
         menu.addItem(historyItem)
+        menu.addItem(menuItem("Allowed Sites…", #selector(AppDelegate.showAllowedSites(_:)), ""))
         menu.addItem(.separator())
         menu.addItem(menuItem("Copy Page Link", #selector(copyPageURL(_:)), "c", [.command, .shift]))
         menu.addItem(menuItem("Open Page in Browser", #selector(openPageInBrowser(_:)), "o", [.command, .shift]))
@@ -293,7 +293,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// then Show All History.
     private func makeHistoryMenu() -> NSMenu {
         let menu = NSMenu()
-        let recent = appDelegate.history.history.recent(limit: Self.recentHistoryCount)
+        // Pages on sites no longer allowed are left out.
+        let policy = appDelegate.linkPolicy
+        let recent = appDelegate.history.history.recent(limit: Self.recentHistoryCount * 4)
+            .filter { policy.isInternal($0.url) }
+            .prefix(Self.recentHistoryCount)
         if recent.isEmpty {
             let empty = NSMenuItem(title: "No pages visited yet", action: nil, keyEquivalent: "")
             empty.isEnabled = false
@@ -345,7 +349,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         guard let window else { return }
         let alert = NSAlert()
         alert.messageText = "Open Link"
-        alert.informativeText = error ?? "Paste or type a web address. It opens in \(appDelegate.config.appName), even if it’s on another site."
+        alert.informativeText = error ?? "Paste or type a web address on \(appDelegate.ownSite) or one of the app’s allowed sites."
         if error != nil { alert.alertStyle = .warning }
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
         field.stringValue = text
@@ -368,10 +372,47 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                 }
                 return
             }
-            if response == .alertSecondButtonReturn, let tab = self.selectedTab {
-                tab.load(url)
-            } else {
-                self.openTab(url: url)
+            let inNewTab = response != .alertSecondButtonReturn
+            guard self.appDelegate.linkPolicy.isInternal(url) else {
+                DispatchQueue.main.async { self.offerToAllow(url, typed: input, inNewTab: inNewTab) }
+                return
+            }
+            self.open(url, inNewTab: inNewTab)
+        }
+    }
+
+    private func open(_ url: URL, inNewTab: Bool) {
+        if !inNewTab, let tab = selectedTab {
+            tab.load(url)
+        } else {
+            openTab(url: url)
+        }
+    }
+
+    /// Open Link was given a page outside the app's sites: it's not opened unless its site is
+    /// added to Allowed Sites.
+    private func offerToAllow(_ url: URL, typed: String, inNewTab: Bool) {
+        guard let window, let domain = LinkPolicy.domain(of: url) else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "\(domain) isn’t allowed in \(appDelegate.config.appName)"
+        alert.informativeText = """
+        This app opens pages on \(appDelegate.ownSite) and its allowed sites only. \
+        Add \(domain) to Allowed Sites to open this link here.
+        """
+        alert.addButton(withTitle: "Allow \(domain) and Open")
+        alert.addButton(withTitle: "Edit Link")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self else { return }
+            switch response {
+            case .alertFirstButtonReturn:
+                self.appDelegate.allowedSites.add(domain)
+                self.open(url, inNewTab: inNewTab)
+            case .alertSecondButtonReturn:
+                DispatchQueue.main.async { self.presentOpenLink(text: typed, error: nil) }
+            default:
+                break
             }
         }
     }

@@ -42,4 +42,21 @@ final class LinkPolicyTests: XCTestCase {
         XCTAssertTrue(p.isInternal(URL(string: "https://example.com/a")!))
         XCTAssertTrue(p.isInternal(URL(string: "https://docs.example.com")!))
     }
+
+    func testAllowedDomainsAreInternal() {
+        let allowed = LinkPolicy(baseURL: URL(string: "https://app.example.com")!, allowedDomains: ["github.com", "https://www.Notion.so/page"])
+        XCTAssertEqual(allowed.destination(for: URL(string: "https://github.com/foo")!), .app)
+        XCTAssertEqual(allowed.destination(for: URL(string: "https://gist.github.com/x")!), .app)
+        XCTAssertEqual(allowed.destination(for: URL(string: "https://notion.so")!), .app)
+        XCTAssertEqual(allowed.destination(for: URL(string: "https://github.com.evil.io")!), .browser)
+        XCTAssertEqual(allowed.destination(for: URL(string: "https://gitlab.com")!), .browser)
+    }
+
+    func testNormalizeDomain() {
+        XCTAssertEqual(LinkPolicy.normalizeDomain(" WWW.GitHub.com "), "github.com")
+        XCTAssertEqual(LinkPolicy.normalizeDomain("https://linear.app/team/issue"), "linear.app")
+        XCTAssertNil(LinkPolicy.normalizeDomain("not a domain"))
+        XCTAssertNil(LinkPolicy.normalizeDomain(""))
+        XCTAssertEqual(LinkPolicy.domain(of: URL(string: "https://www.figma.com/file")!), "figma.com")
+    }
 }
