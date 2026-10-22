@@ -86,7 +86,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let extensionsMenu = ExtensionsMenuController(appDelegate: self)
         self.extensionsMenu = extensionsMenu
         installMainMenu()
-        shortcuts.onChange = { [weak self] in self?.installMainMenu() }
+        // Shortcut changes come from the Keyboard Shortcuts window, on the main thread.
+        shortcuts.onChange = { [weak self] in
+            MainActor.assumeIsolated { self?.installMainMenu() }
+        }
         profiles.onChange = { [weak self] in
             self?.windowControllers.forEach { $0.refreshProfile() }
         }
@@ -114,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
     }
 
+    @MainActor
     private func installMainMenu() {
         guard let config, let extensionsMenu else { return }
         MainMenu.install(appName: config.appName, extensionsMenuDelegate: extensionsMenu, shortcuts: shortcuts)
