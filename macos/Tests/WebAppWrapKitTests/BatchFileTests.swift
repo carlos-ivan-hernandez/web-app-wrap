@@ -19,15 +19,16 @@ final class BatchFileTests: XCTestCase {
 
     func testFullEntry() throws {
         let entries = try parse(##"""
-        [{"name": "Web App Wrap/Photos", "url": "kphotos.vercel.app", "image": "icons/photos.png",
-          "zoom": 1.5, "titleBarColor": "#1a1a1a"}]
+        [{"name": "Web App Wrap/Photos", "url": "kphotos.vercel.app", "image": "icons/photos.svg",
+          "zoom": 0.5, "iconBackground": "#fff", "titleBarColor": "#1a1a1a"}]
         """##)
         XCTAssertEqual(entries.count, 1)
         let entry = entries[0]
         XCTAssertEqual(entry.location, AppLocation("Web App Wrap/Photos"))
         XCTAssertEqual(entry.url.absoluteString, "https://kphotos.vercel.app")
-        XCTAssertEqual(entry.image?.path, "/Users/me/apps/icons/photos.png")
-        XCTAssertEqual(entry.zoom, 1.5)
+        XCTAssertEqual(entry.image?.path, "/Users/me/apps/icons/photos.svg")
+        XCTAssertEqual(entry.zoom, 0.5)
+        XCTAssertEqual(entry.iconBackground?.hexString, "#FFFFFF")
         XCTAssertEqual(entry.titleBarColor?.hexString, "#1A1A1A")
     }
 
@@ -35,6 +36,7 @@ final class BatchFileTests: XCTestCase {
         let entry = try parse(#"[{"name": "Linear", "url": "linear.app"}]"#)[0]
         XCTAssertNil(entry.image)
         XCTAssertEqual(entry.zoom, 1)
+        XCTAssertNil(entry.iconBackground)
         XCTAssertNil(entry.titleBarColor)
     }
 
@@ -83,13 +85,14 @@ final class BatchFileTests: XCTestCase {
         let message = errorMessage(#"""
         [{"name": "Good", "url": "good.com"},
          {"url": "nameless.com"},
-         {"name": "Bad", "url": "not a url", "zoom": 9, "titleBarColor": "teal", "icon": "x.png"},
+         {"name": "Bad", "url": "not a url", "zoom": 9, "iconBackground": 3, "titleBarColor": "teal", "icon": "x.png"},
          "oops"]
         """#)
         XCTAssertTrue(message.contains("Entry 2: “name” is missing."), message)
         XCTAssertTrue(message.contains("Entry 3 (Bad): unknown field “icon”"), message)
         XCTAssertTrue(message.contains("“url” is missing or isn’t a web address"), message)
-        XCTAssertTrue(message.contains("“zoom” must be a number from 1 to 3"), message)
+        XCTAssertTrue(message.contains("“zoom” must be a number from 0.5 to 3"), message)
+        XCTAssertTrue(message.contains("“iconBackground” must be a color"), message)
         XCTAssertTrue(message.contains("“titleBarColor” must be a color"), message)
         XCTAssertTrue(message.contains("Entry 4 isn’t an object."), message)
         XCTAssertFalse(message.contains("Entry 1"), message)

@@ -9,6 +9,9 @@ public struct HexColor: Equatable {
     /// The title bar color used when none is chosen.
     public static let defaultTitleBar = HexColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1C / 255)
 
+    /// The color behind an SVG icon when none is chosen.
+    public static let defaultIconBackground = HexColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1C / 255)
+
     public init(red: Double, green: Double, blue: Double) {
         self.red = min(max(red, 0), 1)
         self.green = min(max(green, 0), 1)

@@ -6,15 +6,18 @@ import Foundation
 ///       {
 ///         "name": "WebAppWrap/Photos",
 ///         "url": "https://kphotos.vercel.app",
-///         "image": "icons/photos.png",
-///         "zoom": 1.2,
+///         "image": "icons/photos.svg",
+///         "zoom": 0.8,
+///         "iconBackground": "#ffffff",
 ///         "titleBarColor": "#1a1a1a"
 ///       }
 ///     ]
 ///
 /// Only `name` and `url` are required. `name` may include folders, as in the window.
-/// `image` is a path, relative to the batch file unless absolute (`~` works).
-/// `zoom` (1–3) is on top of the automatic zoom that crops off a border.
+/// `image` is a path, relative to the batch file unless absolute (`~` works). An SVG is drawn on
+/// `iconBackground` (default #1C1C1C), and `zoom` (0.5–3) scales it, where 1 fits the whole SVG.
+/// Other images are cropped to fill the icon as before SVG support, and `zoom` (1–3) is on top
+/// of the automatic zoom that crops off a border.
 /// `titleBarColor` defaults to the site's theme color.
 /// The file may be JSON, JSONC or JSON5 (comments, trailing commas, unquoted keys and so on).
 public struct BatchEntry: Equatable {
@@ -22,13 +25,15 @@ public struct BatchEntry: Equatable {
     public let url: URL
     public let image: URL?
     public let zoom: Double
+    public let iconBackground: HexColor?
     public let titleBarColor: HexColor?
 
-    public init(location: AppLocation, url: URL, image: URL?, zoom: Double, titleBarColor: HexColor?) {
+    public init(location: AppLocation, url: URL, image: URL?, zoom: Double, iconBackground: HexColor? = nil, titleBarColor: HexColor?) {
         self.location = location
         self.url = url
         self.image = image
         self.zoom = zoom
+        self.iconBackground = iconBackground
         self.titleBarColor = titleBarColor
     }
 }
@@ -39,7 +44,8 @@ public enum BatchFile {
         public var errorDescription: String? { message }
     }
 
-    public static let zoomRange: ClosedRange<Double> = 1...3
+    /// 0.5–1 only zooms out an SVG; other images can't zoom out past 1.
+    public static let zoomRange: ClosedRange<Double> = 0.5...3
 
     /// File extensions offered when choosing a batch file.
     public static let fileExtensions = ["json", "jsonc", "json5"]
@@ -60,7 +66,7 @@ public enum BatchFile {
 
         var entries: [BatchEntry] = []
         var problems: [String] = []
-        let knownKeys: Set<String> = ["name", "url", "image", "zoom", "titleBarColor"]
+        let knownKeys: Set<String> = ["name", "url", "image", "zoom", "iconBackground", "titleBarColor"]
 
         for (index, element) in objects.enumerated() {
             let label = "Entry \(index + 1)"
@@ -99,8 +105,14 @@ public enum BatchFile {
                 if let number = (value as? Double) ?? (value as? Int).map(Double.init), zoomRange.contains(number) {
                     zoom = number
                 } else {
-                    entryProblems.append("“zoom” must be a number from 1 to 3")
+                    entryProblems.append("“zoom” must be a number from 0.5 to 3")
                 }
+            }
+
+            var iconBackground: HexColor?
+            if let value = object["iconBackground"], !(value is NSNull) {
+                iconBackground = (value as? String).flatMap(HexColor.init(css:))
+                if iconBackground == nil { entryProblems.append("“iconBackground” must be a color like \"#1c1c1c\"") }
             }
 
             var titleBarColor: HexColor?
@@ -110,7 +122,7 @@ public enum BatchFile {
             }
 
             if let url, entryProblems.isEmpty {
-                entries.append(BatchEntry(location: location, url: url, image: image, zoom: zoom, titleBarColor: titleBarColor))
+                entries.append(BatchEntry(location: location, url: url, image: image, zoom: zoom, iconBackground: iconBackground, titleBarColor: titleBarColor))
             } else {
                 problems.append("\(entryLabel): \(entryProblems.joined(separator: "; ")).")
             }

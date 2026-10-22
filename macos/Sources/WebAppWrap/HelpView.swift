@@ -71,7 +71,7 @@ struct HelpView: View {
             bullets([
                 "**App name**: shown in the Dock and menu bar. Add folders with “/”: “WebAppWrap/Photos” saves Photos.app in a WebAppWrap folder inside your apps folder.",
                 "**Web address**: where new tabs open.",
-                "**Icon image** (optional): a square image, rounded to the macOS icon shape. Any solid or transparent border is cropped off automatically; the slider zooms in further.",
+                "**Icon** (optional): an SVG, drawn on a background color you choose (#1C1C1C unless you pick another) and rounded to the macOS icon shape. The slider zooms the SVG out or in.",
                 "**Title bar color**: filled in from the site’s theme color; pick another to override it.",
             ])
             paragraph("""
@@ -111,18 +111,19 @@ struct HelpView: View {
 
             command(
                 "build",
-                usage: "webappwrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>] [--title-bar-color <#RRGGBB>] [--out <folder>]",
+                usage: "webappwrap build --name <name> --url <address> [--image <file.svg>] [--zoom <0.5-3>] [--icon-background <#RRGGBB>] [--title-bar-color <#RRGGBB>] [--out <folder>]",
                 summary: "Creates one app.",
                 options: [
                     .init("--name", "App name. May include folders, e.g. \"WebAppWrap/Photos\". Required."),
                     .init("--url", "Web address. https:// is added if missing. Required."),
-                    .init("--image", "Icon image. Without it, a colored tile with the name’s first letter is drawn."),
-                    .init("--zoom", "1–3, on top of the automatic zoom that crops off the image’s border. Default 1."),
-                    .init("--no-auto-zoom", "Use the image as it is, without cropping off its border."),
+                    .init("--image", "Icon SVG. Without it, a colored tile with the name’s first letter is drawn. Other images such as PNG still work as before: cropped to fill the icon."),
+                    .init("--zoom", "0.5–3. At 1 the whole SVG fits in the icon; lower zooms out, higher zooms in. Default 1. (For other images: 1–3, on top of the automatic border crop.)"),
+                    .init("--icon-background", "Hex color behind the SVG. Default #1C1C1C."),
+                    .init("--no-auto-zoom", "For other images: use the image as it is, without cropping off its border."),
                     .init("--title-bar-color", "Hex color such as #1a1a1a. Default: the site’s theme color."),
                     .init("--out", "Folder the app (and any folders in its name) go in. Defaults to the folder chosen in Settings, or /Applications."),
                 ],
-                example: #"webappwrap build --name "Linear" --url linear.app --image ~/Pictures/linear.png"#
+                example: #"webappwrap build --name "Linear" --url linear.app --image ~/Pictures/linear.svg"#
             )
 
             command(
@@ -135,7 +136,7 @@ struct HelpView: View {
 
             command(
                 "icon",
-                usage: "webappwrap icon --name <name> [--image <file>] [--zoom <1-3>] [--symbol <sf-symbol>] --out <file.icns>",
+                usage: "webappwrap icon --name <name> [--image <file.svg>] [--zoom <0.5-3>] [--icon-background <#RRGGBB>] [--symbol <sf-symbol>] --out <file.icns>",
                 summary: "Writes just the .icns icon, using the same rules as build.",
                 options: [
                     .init("--symbol", "Draw an SF Symbol (e.g. globe) on the default tile instead of a letter."),
@@ -156,8 +157,9 @@ struct HelpView: View {
               {
                 "name": "WebAppWrap/Photos",
                 "url": "https://kphotos.vercel.app",
-                "image": "icons/photos.png",
-                "zoom": 1.2,
+                "image": "icons/photos.svg",
+                "zoom": 0.8,
+                "iconBackground": "#ffffff",
                 "titleBarColor": "#1a1a1a"
               },
               { "name": "Linear", "url": "linear.app" }
@@ -165,7 +167,8 @@ struct HelpView: View {
             """)
             bullets([
                 "**image**: relative to the JSON file unless it starts with / or ~.",
-                "**zoom**: 1–3, on top of the automatic border crop.",
+                "**zoom**: 0.5–3. At 1 the whole SVG fits in the icon.",
+                "**iconBackground**: the color behind the SVG. Defaults to #1C1C1C.",
                 "**titleBarColor**: defaults to the site’s theme color.",
             ])
         }

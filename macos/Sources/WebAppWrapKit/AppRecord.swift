@@ -8,16 +8,20 @@ public struct AppSettings: Codable, Equatable {
     public var url: String
     /// File name in AppRegistry's icons folder. nil draws the default icon.
     public var icon: String?
-    /// 1–3, on top of the automatic zoom that crops off a border.
+    /// For an SVG icon, 0.5–3, where 1 fits the whole SVG in the icon. For other images (icons
+    /// saved before SVG support), 1–3 on top of the automatic zoom that crops off a border.
     public var zoom: Double
+    /// "#RRGGBB" behind an SVG icon. nil uses HexColor.defaultIconBackground.
+    public var iconBackground: String?
     /// "#RRGGBB". nil uses the site's theme color.
     public var titleBarColor: String?
 
-    public init(name: String, url: String, icon: String? = nil, zoom: Double = 1, titleBarColor: String? = nil) {
+    public init(name: String, url: String, icon: String? = nil, zoom: Double = 1, iconBackground: String? = nil, titleBarColor: String? = nil) {
         self.name = name
         self.url = url
         self.icon = icon
         self.zoom = zoom
+        self.iconBackground = iconBackground
         self.titleBarColor = titleBarColor
     }
 
@@ -89,6 +93,7 @@ public struct AppRecord: Codable, Equatable, Identifiable {
             url: url,
             image: settings.icon.map { iconsFolder.appendingPathComponent($0) },
             zoom: settings.zoom,
+            iconBackground: settings.iconBackground.flatMap(HexColor.init(hex:)),
             titleBarColor: settings.titleBarColor.flatMap(HexColor.init(hex:))
         )
     }

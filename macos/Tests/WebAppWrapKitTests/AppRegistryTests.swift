@@ -2,7 +2,7 @@ import XCTest
 @testable import WebAppWrapKit
 
 final class AppRecordTests: XCTestCase {
-    private let settings = AppSettings(name: "Tools/Linear", url: "https://linear.app", icon: "a.png", zoom: 1.2, titleBarColor: "#1A1A1A")
+    private let settings = AppSettings(name: "Tools/Linear", url: "https://linear.app", icon: "a.svg", zoom: 1.2, iconBackground: "#FFFFFF", titleBarColor: "#1A1A1A")
 
     private func built(version: String?, settings: AppSettings? = nil) -> AppRecord {
         AppRecord(settings: self.settings, lastBuild: BuildStamp(version: version, date: Date(), settings: settings ?? self.settings))
@@ -45,9 +45,24 @@ final class AppRecordTests: XCTestCase {
         let entry = try XCTUnwrap(AppRecord(settings: settings).batchEntry(iconsFolder: URL(fileURLWithPath: "/icons")))
         XCTAssertEqual(entry.location, AppLocation("Tools/Linear"))
         XCTAssertEqual(entry.url.absoluteString, "https://linear.app")
-        XCTAssertEqual(entry.image?.path, "/icons/a.png")
+        XCTAssertEqual(entry.image?.path, "/icons/a.svg")
         XCTAssertEqual(entry.zoom, 1.2)
+        XCTAssertEqual(entry.iconBackground?.hexString, "#FFFFFF")
         XCTAssertEqual(entry.titleBarColor?.hexString, "#1A1A1A")
+    }
+
+    func testChangedIconBackgroundCountsAsChanged() {
+        var old = settings
+        old.iconBackground = "#1C1C1C"
+        XCTAssertEqual(built(version: "abc", settings: old).buildReason(currentVersion: "abc", appExists: true), .changed)
+    }
+
+    /// Lists saved before icon backgrounds existed still load, and their apps aren't marked changed.
+    func testSettingsWithoutIconBackgroundStillDecode() throws {
+        let json = #"{"name": "A", "url": "https://a.com", "icon": "a.png", "zoom": 1.5}"#
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+        XCTAssertNil(decoded.iconBackground)
+        XCTAssertEqual(decoded, AppSettings(name: "A", url: "https://a.com", icon: "a.png", zoom: 1.5))
     }
 
     func testLocationKeyIgnoresCase() {

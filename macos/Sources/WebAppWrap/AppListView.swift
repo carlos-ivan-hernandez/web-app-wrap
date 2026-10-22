@@ -188,8 +188,11 @@ private struct AppRow: View {
     }
 
     private var iconSource: IconSource {
-        if let iconURL, let image = NSImage(contentsOf: iconURL), image.isValid {
-            return .image(image, zoom: IconRenderer.automaticZoom(for: image) * CGFloat(record.settings.zoom))
+        if let iconURL, let icon = IconSource.load(
+            iconURL, zoom: record.settings.zoom,
+            background: record.settings.iconBackground.flatMap(HexColor.init(hex:))
+        ) {
+            return icon
         }
         return .generated(name: record.settings.location.name)
     }

@@ -63,6 +63,13 @@ have them yet:
       there's more than one. WebView2 profiles: `CoreWebView2ControllerOptions.ProfileName`.
 - [ ] **Keyboard Shortcuts…** in the ⋮ menu: change any command's shortcut,
       stored per app.
+- [ ] **SVG icons.** The window takes an SVG instead of an image, drawn on a
+      background color the user picks (default #1C1C1C) with a zoom slider from
+      0.5 to 3 (1 fits the whole SVG). Batch files get `iconBackground` and
+      `waw` gets `--icon-background`. Other images keep working as before for
+      batch files and the command line. SkiaSharp can't read SVG; the
+      `Svg.Skia` package can. See `IconSource.svg` and `IconSource.load` in
+      `macos/Sources/WebAppWrap/IconRenderer.swift`, and `AppDraft.swift`.
 
 On macOS, the code to follow is:
 

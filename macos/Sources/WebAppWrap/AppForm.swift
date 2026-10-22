@@ -30,10 +30,10 @@ struct AppForm: View {
                 .dropDestination(for: URL.self) { urls, _ in
                     draft.loadImage(from: urls.first)
                 }
-                .help("Drop an image here")
+                .help("Drop an SVG here")
 
             HStack(spacing: 6) {
-                Button("Choose Image…") { draft.chooseImage() }
+                Button("Choose SVG…") { draft.chooseImage() }
                 if draft.customImage != nil {
                     Button("Use Default") { draft.clearImage() }
                 }
@@ -43,21 +43,30 @@ struct AppForm: View {
             if draft.customImage != nil {
                 HStack(spacing: 6) {
                     Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
-                    Slider(
-                        value: $draft.imageZoom,
-                        in: Double(IconSource.userZoomRange.lowerBound)...Double(IconSource.userZoomRange.upperBound)
-                    )
-                    .controlSize(.small)
+                    Slider(value: $draft.imageZoom, in: draft.zoomRange)
+                        .controlSize(.small)
                     Image(systemName: "plus.magnifyingglass").foregroundStyle(.secondary)
                 }
-                .help("Zoom in on the image")
+                .help(draft.imageIsSVG ? "Zoom the SVG out or in" : "Zoom in on the image")
+            }
+
+            if draft.customImage != nil, draft.imageIsSVG {
+                HStack(spacing: 6) {
+                    ColorPicker("Background", selection: $draft.iconBackground, supportsOpacity: false)
+                    Text(draft.iconBackgroundHex.hexString)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                .font(.caption)
+                .controlSize(.small)
+                .help("The color behind the SVG")
             }
 
             Group {
                 if let error = draft.imageError {
                     Text(error).foregroundColor(.red)
                 } else {
-                    Text(draft.customImage == nil ? "Default icon. Drop an image to use your own." : draft.imageFileName)
+                    Text(draft.customImage == nil ? "Default icon. Drop an SVG to use your own." : draft.imageFileName)
                         .foregroundStyle(.secondary)
                 }
             }

@@ -3,7 +3,7 @@
 A native macOS app that turns any web app into its own native macOS app, with
 real tabs.
 
-Give it a name, a web address, and (optionally) an image. It creates
+Give it a name, a web address, and (optionally) an SVG icon. It creates
 `<Name>.app` with a full set of macOS icon sizes, its own Dock icon, and its own
 cookies and storage.
 
@@ -151,14 +151,15 @@ single app right now, and **My Apps** keeps a list of your apps and builds them.
    your apps folder, put the folder in the name: `WebAppWrap/Photos` creates
    `/Applications/WebAppWrap/Photos.app`, and the app is named "Photos". You can leave out `https://`.
    Addresses that start with `localhost` use `http://`.
-3. Optionally, drop a square image on the icon area or click **Choose Image…**.
-   PNG, JPEG, HEIC, PDF and ICNS files all work. WebAppWrap rounds the corners to
-   the macOS icon shape and adds the standard margin and shadow. If you want to
-   crop in, drag the zoom slider under the preview. If the image has a solid-color
-   or transparent border, for example an icon that's already rounded on a white
-   square, WebAppWrap zooms in just far enough to crop the border out. That zoom is the
-   starting point, and the slider only zooms in further from there. Without an image, WebAppWrap
-   draws a colored tile with the app name's first letter.
+3. Optionally, drop an SVG on the icon area or click **Choose SVG…**. WebAppWrap
+   draws it on a solid background, rounds the corners to the macOS icon shape and
+   adds the standard margin and shadow. Pick the **Background** color under the
+   preview; it's #1C1C1C unless you choose another. At the slider's starting point
+   the whole SVG fits in the icon; drag left to shrink it and leave more
+   background around it, or right to zoom in and crop. Without an SVG, WebAppWrap
+   draws a colored tile with the app name's first letter. (Apps in My Apps that
+   already have a PNG or other image icon keep it, drawn as before, until you
+   choose an SVG for them.)
 4. Check the **Title bar color**. It's the background of the bar holding the
    window buttons and tabs. After you enter the web address, WebAppWrap fills it in
    with the site's theme color, from its `<meta name="theme-color">` tag or its
@@ -195,7 +196,7 @@ apps in it.
 
 An app is **skipped** when both of these are true:
 
-- Nothing about it (name, address, icon, zoom or title bar color) has changed
+- Nothing about it (name, address, icon, zoom, icon background or title bar color) has changed
   since it was last built.
 - It was last built by this version of WebAppWrap.
 
@@ -313,8 +314,9 @@ inputs as the window:
   {
     "name": "WebAppWrap/Photos",
     "url": "https://kphotos.vercel.app",
-    "image": "icons/photos.png",
-    "zoom": 1.2,
+    "image": "icons/photos.svg",
+    "zoom": 0.8,
+    "iconBackground": "#ffffff",
     "titleBarColor": "#1a1a1a"
   },
   { "name": "Linear", "url": "linear.app" }
@@ -325,8 +327,9 @@ inputs as the window:
 | --- | --- | --- |
 | `name` | yes | App name. It may include folders under the apps folder, as in the window |
 | `url` | yes | Web address |
-| `image` | no | Icon image path, relative to the JSON file unless absolute (`~` works). Without it, WebAppWrap draws the default icon |
-| `zoom` | no | 1–3, applied on top of the automatic zoom that crops off a border. Defaults to 1 |
+| `image` | no | Icon SVG path, relative to the JSON file unless absolute (`~` works). Without it, WebAppWrap draws the default icon. Other images such as PNG still work as before: cropped to fill the icon, with no background |
+| `zoom` | no | 0.5–3. At 1 the whole SVG fits in the icon; lower zooms out, higher zooms in. Defaults to 1. For other images, 1–3 on top of the automatic zoom that crops off a border |
+| `iconBackground` | no | The color behind the SVG, for example `"#ffffff"`. Defaults to `#1C1C1C` |
 | `titleBarColor` | no | For example `"#1a1a1a"`. Defaults to the site's theme color |
 
 The file can also be JSONC or JSON5 (`.jsonc`, `.json5`), so comments, trailing
@@ -350,7 +353,7 @@ the end without stopping the rest.
 ```bash
 wrap="/Applications/WebAppWrap.app/Contents/MacOS/WebAppWrap"
 "$wrap" build --name "WebAppWrap/Linear" --url linear.app
-"$wrap" build --name "Grafana" --url localhost:3000 --image ~/grafana.png --zoom 1.2 --title-bar-color "#1a1a1a" --out ~/Applications # --out defaults to the apps folder
+"$wrap" build --name "Grafana" --url localhost:3000 --image ~/grafana.svg --zoom 0.8 --icon-background "#ffffff" --title-bar-color "#1a1a1a" --out ~/Applications # --out defaults to the apps folder
 "$wrap" batch ~/apps.json                      # every app in a JSON file
 "$wrap" icon --name "Linear" --out Linear.icns # just the icon
 ```

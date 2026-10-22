@@ -13,15 +13,15 @@ enum BatchBuilder {
         var errorDescription: String? { "Couldn’t read an image from \(path)." }
     }
 
-    /// The same choices the window makes: automatic icon zoom times the entry's zoom, and the
+    /// The same choices the window makes: the icon drawn as in `IconSource.load`, and the
     /// site's theme color unless the entry names a color.
     static func spec(for entry: BatchEntry, appID: UUID? = nil) async throws -> AppSpec {
         var icon = IconSource.generated(name: entry.location.name)
         if let imageURL = entry.image {
-            guard let image = NSImage(contentsOf: imageURL), image.isValid else {
+            guard let loaded = IconSource.load(imageURL, zoom: entry.zoom, background: entry.iconBackground) else {
                 throw UnreadableImage(path: imageURL.path)
             }
-            icon = .image(image, zoom: IconRenderer.automaticZoom(for: image) * CGFloat(entry.zoom))
+            icon = loaded
         }
         var titleBarColor = HexColor.defaultTitleBar
         if let chosen = entry.titleBarColor {

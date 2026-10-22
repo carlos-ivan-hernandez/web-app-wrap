@@ -1,17 +1,42 @@
 import AppKit
+import WebAppWrapKit
 
 enum IconSource {
     /// A colored gradient tile (hue derived from `name`) showing an SF Symbol if given,
     /// otherwise the name's first letter.
     case generated(name: String, symbol: String? = nil)
-    /// A user image, cropped to fill the rounded-square icon shape. `zoom` > 1 crops in
-    /// further, keeping the image centered.
+    /// An SVG on a solid `background`. At `zoom` 1 the whole SVG fits in the icon shape;
+    /// below 1 it shrinks, above 1 it grows and is cropped, staying centered.
+    case svg(NSImage, zoom: CGFloat = 1, background: HexColor = .defaultIconBackground)
+    /// Any other image (icons saved before SVG support), cropped to fill the rounded-square
+    /// icon shape. `zoom` > 1 crops in further, keeping the image centered.
     case image(NSImage, zoom: CGFloat = 1)
 
-    /// How far the user can zoom in, on top of the automatic zoom that crops off a border.
+    /// How far the user can zoom an SVG out and in.
+    static let svgZoomRange: ClosedRange<CGFloat> = 0.5...3
+    /// How far the user can zoom other images in, on top of the automatic zoom that crops off a border.
     static let userZoomRange: ClosedRange<CGFloat> = 1...3
     /// The furthest the automatic zoom will go looking for the edge of the artwork.
     static let maximumAutomaticZoom: CGFloat = 3
+
+    static func isSVG(_ url: URL) -> Bool {
+        url.pathExtension.lowercased() == "svg"
+    }
+
+    /// Reads an image file the way the window draws it: an SVG on `background` (default
+    /// #1C1C1C), anything else with the automatic border crop. `zoom` is the user's zoom.
+    /// Nil if macOS can't read the file.
+    static func load(_ url: URL, zoom: Double = 1, background: HexColor? = nil) -> IconSource? {
+        guard let image = NSImage(contentsOf: url), image.isValid,
+              image.size.width > 0, image.size.height > 0
+        else { return nil }
+        if isSVG(url) {
+            let zoom = min(max(CGFloat(zoom), svgZoomRange.lowerBound), svgZoomRange.upperBound)
+            return .svg(image, zoom: zoom, background: background ?? .defaultIconBackground)
+        }
+        let zoom = min(max(CGFloat(zoom), userZoomRange.lowerBound), userZoomRange.upperBound)
+        return .image(image, zoom: IconRenderer.automaticZoom(for: image) * zoom)
+    }
 }
 
 /// Draws icons on Apple's macOS grid: an 824pt rounded square centered on a 1024pt canvas.
@@ -199,6 +224,15 @@ enum IconRenderer {
                 drawGradient(seed: name, in: context)
                 if let symbol, drawSymbol(symbol) { return }
                 drawLetter(of: name)
+            }
+
+        case let .svg(image, zoom, background):
+            let zoom = max(zoom, 0.01)
+            let grow = tileRect.width * (zoom - 1) / 2
+            drawTile(in: context, scale: scale) {
+                context.setFillColor(CGColor(srgbRed: background.red, green: background.green, blue: background.blue, alpha: 1))
+                context.fill(tileRect)
+                drawImage(image, in: tileRect.insetBy(dx: -grow, dy: -grow), fill: false)
             }
 
         case let .image(image, zoom):

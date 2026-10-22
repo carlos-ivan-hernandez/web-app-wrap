@@ -8,22 +8,27 @@ enum CommandLineInterface {
       WebAppWrap
           Open the app.
 
-      WebAppWrap build --name <name> --url <address> [--image <file>] [--zoom <1-3>] [--no-auto-zoom]
-                    [--title-bar-color <#RRGGBB>] [--out <folder>]
+      WebAppWrap build --name <name> --url <address> [--image <file.svg>] [--zoom <0.5-3>]
+                    [--icon-background <#RRGGBB>] [--title-bar-color <#RRGGBB>] [--out <folder>]
           Create one app. <name> may include folders, e.g. "WebAppWrap/Photos".
-          --zoom adds to the automatic zoom that crops off an image's border.
-          --no-auto-zoom uses the image as it is, border and all.
+          The SVG is drawn on --icon-background (default #1C1C1C). At --zoom 1 the
+          whole SVG fits in the icon; lower zooms out, higher zooms in.
+          Other images (PNG and so on) still work as before: cropped to fill the
+          icon, with --zoom 1-3 on top of an automatic zoom that crops off their
+          border, unless --no-auto-zoom.
           The title bar color defaults to the site's theme color.
           --out is the folder apps go in (default: the folder chosen in WebAppWrap's
           Settings, or /Applications).
 
       WebAppWrap batch <file.json> [--out <folder>]
           Create every app listed in a JSON array of objects with the fields
-          name, url, image, zoom and titleBarColor (only name and url are required).
+          name, url, image, zoom, iconBackground and titleBarColor (only name and url
+          are required).
           JSONC and JSON5 (comments, trailing commas, unquoted keys) work too.
           Apps built from the command line aren't added to the window's My Apps list.
 
-      WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file>] [--zoom <1-3>] [--no-auto-zoom] --out <file.icns>
+      WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file.svg>] [--zoom <0.5-3>]
+                   [--icon-background <#RRGGBB>] --out <file.icns>
           Write just the icon.
     """
 
@@ -61,14 +66,21 @@ enum CommandLineInterface {
             return .generated(name: name, symbol: value("--symbol", in: options))
         }
         let url = URL(fileURLWithPath: (imagePath as NSString).expandingTildeInPath)
-        guard let image = NSImage(contentsOf: url) else {
+        var background: HexColor?
+        if let raw = value("--icon-background", in: options) {
+            guard let parsed = HexColor(hex: raw) else { throw UsageError(message: "--icon-background must look like #1C1C1C.") }
+            background = parsed
+        }
+        let zoom = value("--zoom", in: options).flatMap(Double.init) ?? 1
+        guard let icon = IconSource.load(url, zoom: zoom, background: background) else {
             throw UsageError(message: "Couldn’t read an image from \(imagePath).")
         }
-        // --zoom is on top of the automatic zoom that crops off any border, unless --no-auto-zoom.
-        let extra = value("--zoom", in: options).flatMap(Double.init).map { CGFloat($0) } ?? 1
-        let automatic = options.contains("--no-auto-zoom") ? 1 : IconRenderer.automaticZoom(for: image)
-        let zoom = automatic * min(max(extra, IconSource.userZoomRange.lowerBound), IconSource.userZoomRange.upperBound)
-        return .image(image, zoom: zoom)
+        // --no-auto-zoom: use a non-SVG image as it is, border and all.
+        if options.contains("--no-auto-zoom"), case let .image(image, _) = icon {
+            let extra = min(max(CGFloat(zoom), IconSource.userZoomRange.lowerBound), IconSource.userZoomRange.upperBound)
+            return .image(image, zoom: extra)
+        }
+        return icon
     }
 
     private static func build(_ options: [String]) throws {
