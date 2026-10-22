@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import WebAppWrapKit
 
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
