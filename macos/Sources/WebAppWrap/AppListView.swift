@@ -216,7 +216,7 @@ struct AppEditorSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(isNew ? "Add App" : "Edit App").font(.title2.weight(.semibold))
-            AppForm(draft: draft) { save() }
+            AppForm(draft: draft, onSubmit: { save() })
             if let note = renameNote {
                 Text(note).font(.caption).foregroundStyle(.secondary)
             }
