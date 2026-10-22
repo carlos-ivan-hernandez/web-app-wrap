@@ -6,6 +6,10 @@ import WebAppWrapKit
 struct AppForm: View {
     @ObservedObject var draft: AppDraft
     var onSubmit: () -> Void = {}
+    /// Shows a Change Folder… link after "Saves to …" when set.
+    var onChangeFolder: (() -> Void)? = nil
+    /// Read so the "Saves to" path updates when the apps folder changes.
+    @AppStorage(AppsFolder.defaultsKey) private var appsFolderPath = ""
 
     var body: some View {
         HStack(alignment: .top, spacing: 28) {
@@ -75,7 +79,17 @@ struct AppForm: View {
                 if draft.trimmedName.isEmpty {
                     caption("Shown in the Dock, menu bar and Finder. Add folders with “/”.")
                 } else {
-                    caption("Saves to \(draft.destination.path)")
+                    HStack(spacing: 6) {
+                        caption("Saves to \(AppsFolder.displayPath(draft.destination))")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(draft.destination.path)
+                        if let onChangeFolder {
+                            Button("Change Folder…", action: onChangeFolder)
+                                .buttonStyle(.link)
+                                .font(.caption)
+                        }
+                    }
                 }
             }
 

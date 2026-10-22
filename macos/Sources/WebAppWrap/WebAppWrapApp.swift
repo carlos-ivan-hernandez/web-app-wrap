@@ -31,6 +31,10 @@ struct WebAppWrapApp: App {
             HelpView()
         }
         .defaultSize(width: 680, height: 760)
+
+        Settings {
+            SettingsView(model: model)
+        }
     }
 }
 

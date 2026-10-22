@@ -16,9 +16,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let contentContainer = NSView()
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
-    /// Extension buttons at the right end of the tab strip.
-    private let extensionToolbar = NSStackView()
-    private var toolbarButtons: [String: ExtensionToolbarButton] = [:]
+    /// The buttons at the right end of the tab strip: Extensions (shown once any are loaded)
+    /// and More (the kebab menu).
+    private let accessoryStack = NSStackView()
+    private let extensionsButton = TitleBarButton(image: TitleBarButton.extensionsImage, label: "Extensions")
+    private let moreButton = TitleBarButton(image: TitleBarButton.kebabImage, label: "More")
+    /// How many recent pages the More menu's History submenu lists.
+    private static let recentHistoryCount = 15
 
     init(appDelegate: AppDelegate) {
         self.appDelegate = appDelegate
@@ -77,10 +81,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // AppKit re-lays out the title bar on resize, focus and appearance changes; put the buttons back each time.
         tabStrip.onLayout = { [weak self] in self?.layoutTrafficLights() }
 
-        extensionToolbar.orientation = .horizontal
-        extensionToolbar.spacing = 2
-        extensionToolbar.isHidden = true
-        tabStrip.trailingAccessory = extensionToolbar
+        accessoryStack.orientation = .horizontal
+        accessoryStack.spacing = 0
+        for button in [extensionsButton, moreButton] {
+            button.contentTintColor = palette.foreground.withAlphaComponent(0.7)
+            button.hoverColor = palette.foreground
+            accessoryStack.addArrangedSubview(button)
+        }
+        extensionsButton.isHidden = true
+        extensionsButton.onPress = { [weak self] button in self?.showExtensionsMenu(from: button) }
+        moreButton.onPress = { [weak self] button in self?.showMoreMenu(from: button) }
+        tabStrip.trailingAccessory = accessoryStack
     }
 
     @available(*, unavailable)
@@ -204,45 +215,165 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
     #endif
 
-    /// The button an extension's popup is shown under.
+    /// The button an extension's popup is shown under: the Extensions button, since every
+    /// extension's toolbar action lives in its menu.
     func toolbarButton(for extensionID: String) -> NSView? {
-        toolbarButtons[extensionID]
+        extensionsButton.isHidden ? nil : extensionsButton
     }
 
-    /// One button per loaded extension that has a toolbar action, showing its icon, label and
-    /// badge for the selected tab. Called when extensions load or change, and on tab switches.
+    /// Shows the Extensions button once any extension is loaded. Called when extensions load
+    /// or change, and on tab switches.
     func refreshExtensionToolbar() {
         #if compiler(>=6.1)
         guard #available(macOS 15.4, *), let host = appDelegate.extensionHost else { return }
-        var shown: [ExtensionToolbarButton] = []
-        for item in host.loaded {
-            let context = item.context
-            guard let action = context.action(for: selectedTab) else { continue }
-            let id = item.installed.id
-            let button = toolbarButtons[id] ?? ExtensionToolbarButton()
-            toolbarButtons[id] = button
-            let size = CGSize(width: 16, height: 16)
-            button.image = action.icon(for: size) ?? context.webExtension.icon(for: size)
-                ?? NSImage(systemSymbolName: "puzzlepiece.extension", accessibilityDescription: nil)
-            button.toolTip = action.label.isEmpty ? item.installed.name : action.label
-            button.badgeText = action.badgeText
-            button.isEnabled = action.isEnabled
-            button.contentTintColor = tabStrip.palette.foreground.withAlphaComponent(0.7)
-            button.onClick = { [weak self, weak button, weak host] in
-                guard let self, let button, let host else { return }
-                host.performAction(context, for: self.selectedTab, anchor: button)
-            }
-            shown.append(button)
+        let isEmpty = host.loaded.isEmpty
+        if extensionsButton.isHidden != isEmpty {
+            extensionsButton.isHidden = isEmpty
+            tabStrip.needsLayout = true
         }
-        let shownIDs = Set(host.loaded.map(\.installed.id))
-        toolbarButtons = toolbarButtons.filter { shownIDs.contains($0.key) && shown.contains($0.value) }
-        if extensionToolbar.arrangedSubviews != shown.map({ $0 as NSView }) {
-            extensionToolbar.arrangedSubviews.forEach { $0.removeFromSuperview() }
-            shown.forEach(extensionToolbar.addArrangedSubview)
-        }
-        extensionToolbar.isHidden = shown.isEmpty
-        tabStrip.needsLayout = true
         #endif
+    }
+
+    /// The Extensions menu under the button: each loaded extension, with its icon and badge for
+    /// the selected tab. Choosing one clicks its toolbar button, and its popup opens under the
+    /// Extensions button.
+    private func showExtensionsMenu(from button: TitleBarButton) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        #if compiler(>=6.1)
+        if #available(macOS 15.4, *), let host = appDelegate.extensionHost {
+            let iconSize = CGSize(width: 16, height: 16)
+            for item in host.loaded {
+                let context = item.context
+                let action = context.action(for: selectedTab)
+                let entry = ClosureMenuItem(title: item.installed.name) { [weak self, weak host] in
+                    guard let self, let host else { return }
+                    host.performAction(context, for: self.selectedTab, anchor: self.extensionsButton)
+                }
+                let icon = action?.icon(for: iconSize) ?? context.webExtension.icon(for: iconSize)
+                if let icon = icon?.copy() as? NSImage {
+                    icon.size = iconSize
+                    entry.image = icon
+                }
+                if let action {
+                    entry.isEnabled = action.isEnabled
+                    if !action.label.isEmpty, action.label != item.installed.name { entry.toolTip = action.label }
+                    if !action.badgeText.isEmpty { entry.badge = NSMenuItemBadge(string: action.badgeText) }
+                } else {
+                    entry.isEnabled = false
+                    entry.toolTip = "This extension has no toolbar button."
+                }
+                menu.addItem(entry)
+            }
+        }
+        #endif
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        menu.addItem(ClosureMenuItem(title: "Manage Extensions in WebAppWrap…") {
+            ExtensionsMenuController.openGenerator()
+        })
+        button.popUp(menu)
+    }
+
+    // MARK: - More menu, Open Link and History
+
+    /// The kebab menu: open a link, recent history, and page commands.
+    private func showMoreMenu(from button: TitleBarButton) {
+        let menu = NSMenu()
+        menu.addItem(menuItem("Open Link…", #selector(openLink(_:)), "l", [.command, .shift]))
+        let historyItem = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
+        historyItem.submenu = makeHistoryMenu()
+        menu.addItem(historyItem)
+        menu.addItem(.separator())
+        menu.addItem(menuItem("Copy Page Link", #selector(copyPageURL(_:)), "c", [.command, .shift]))
+        menu.addItem(menuItem("Open Page in Browser", #selector(openPageInBrowser(_:)), "o", [.command, .shift]))
+        button.popUp(menu)
+    }
+
+    /// Recently visited pages (choosing one opens it in this tab, or a new tab with ⌘),
+    /// then Show All History.
+    private func makeHistoryMenu() -> NSMenu {
+        let menu = NSMenu()
+        let recent = appDelegate.history.history.recent(limit: Self.recentHistoryCount)
+        if recent.isEmpty {
+            let empty = NSMenuItem(title: "No pages visited yet", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            menu.addItem(empty)
+        }
+        for entry in recent {
+            let title = entry.displayTitle
+            let url = entry.url
+            let item = ClosureMenuItem(title: title.count > 60 ? String(title.prefix(59)) + "…" : title) { [weak self] in
+                guard let self else { return }
+                if NSApp.currentEvent?.modifierFlags.contains(.command) == true || self.selectedTab == nil {
+                    self.openTab(url: url)
+                } else {
+                    self.selectedTab?.load(url)
+                }
+            }
+            item.toolTip = url.absoluteString
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        menu.addItem(menuItem("Show All History", #selector(AppDelegate.showHistory(_:)), "y"))
+        return menu
+    }
+
+    private func menuItem(
+        _ title: String,
+        _ action: Selector,
+        _ key: String,
+        _ modifiers: NSEvent.ModifierFlags = .command
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = modifiers
+        // Nil target: the responder chain finds this window (or the app delegate) and checks
+        // validateMenuItem, as the menu bar does.
+        return item
+    }
+
+    /// Asks for a link, for example one copied from another browser, and opens it here.
+    /// The field starts with the clipboard's link, if it holds one.
+    @objc func openLink(_ sender: Any?) {
+        let clipboard = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let suggestion = clipboard.flatMap { text in
+            !text.contains(where: \.isNewline) && InputNormalizer.normalizeURL(text) != nil ? text : nil
+        }
+        presentOpenLink(text: suggestion ?? "", error: nil)
+    }
+
+    private func presentOpenLink(text: String, error: String?) {
+        guard let window else { return }
+        let alert = NSAlert()
+        alert.messageText = "Open Link"
+        alert.informativeText = error ?? "Paste or type a web address. It opens in \(appDelegate.config.appName), even if it’s on another site."
+        if error != nil { alert.alertStyle = .warning }
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
+        field.stringValue = text
+        field.placeholderString = "https://…"
+        field.lineBreakMode = .byTruncatingMiddle
+        field.cell?.usesSingleLineMode = true
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Open in New Tab")
+        alert.addButton(withTitle: "Open in This Tab")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response != .alertThirdButtonReturn else { return }
+            let input = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let url = InputNormalizer.normalizeURL(input) else {
+                if input.isEmpty { return }
+                // Shown again after this sheet has finished closing.
+                DispatchQueue.main.async {
+                    self.presentOpenLink(text: input, error: "“\(input)” isn’t a web address. Enter one like example.com or https://example.com/page.")
+                }
+                return
+            }
+            if response == .alertSecondButtonReturn, let tab = self.selectedTab {
+                tab.load(url)
+            } else {
+                self.openTab(url: url)
+            }
+        }
     }
 
     private func refreshStrip() {

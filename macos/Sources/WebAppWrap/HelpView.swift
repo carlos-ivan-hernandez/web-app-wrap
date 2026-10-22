@@ -54,6 +54,8 @@ struct HelpView: View {
                 "⌘-click opens a link in a new tab; ⌘H and ⌘L switch to the previous and next tab.",
                 "Drag tabs to reorder them. Tabs appear once two or more are open.",
                 "Links to other websites open in your default browser.",
+                "The ⋮ button at the right of the title bar opens a link you paste (⇧⌘L), for example one copied from Chrome, and lists recently visited pages. ⌘Y shows the app’s full history.",
+                "Extensions sit in a menu behind the grid button next to it, rather than as a row of buttons.",
                 "⌥⌘I opens Web Inspector for debugging.",
             ])
         }
@@ -63,7 +65,7 @@ struct HelpView: View {
         section("Two ways to use it") {
             paragraph("**The window** (this app). In **One-Off**, fill in the fields and click **Create App**:")
             bullets([
-                "**App name**: shown in the Dock and menu bar. Add folders with “/”: “WebAppWrap/Photos” saves Photos.app in /Applications/WebAppWrap.",
+                "**App name**: shown in the Dock and menu bar. Add folders with “/”: “WebAppWrap/Photos” saves Photos.app in a WebAppWrap folder inside your apps folder.",
                 "**Web address**: where new tabs open.",
                 "**Icon image** (optional): a square image, rounded to the macOS icon shape. Any solid or transparent border is cropped off automatically; the slider zooms in further.",
                 "**Title bar color**: filled in from the site’s theme color; pick another to override it.",
@@ -74,6 +76,11 @@ struct HelpView: View {
             and click **Build** there to start. An app is skipped when nothing about \
             it changed and it was built by this version of WebAppWrap (\(GeneratorVersion.display)), so \
             after updating WebAppWrap, Build Apps rebuilds them all.
+            """)
+            paragraph("""
+            Apps are saved in /Applications unless you choose another folder in **WebAppWrap → \
+            Settings** (⌘,), or with **Change…** under the list. When you change it, WebAppWrap \
+            offers to move the apps you’ve already built.
             """)
             paragraph("""
             The list and the icon images are kept in ~/Library/Application Support/WebAppWrap, so you \
@@ -109,7 +116,7 @@ struct HelpView: View {
                     .init("--zoom", "1–3, on top of the automatic zoom that crops off the image’s border. Default 1."),
                     .init("--no-auto-zoom", "Use the image as it is, without cropping off its border."),
                     .init("--title-bar-color", "Hex color such as #1a1a1a. Default: the site’s theme color."),
-                    .init("--out", "Folder the app (and any folders in its name) go in. Default /Applications."),
+                    .init("--out", "Folder the app (and any folders in its name) go in. Defaults to the folder chosen in Settings, or /Applications."),
                 ],
                 example: #"webappwrap build --name "Linear" --url linear.app --image ~/Pictures/linear.png"#
             )
@@ -118,7 +125,7 @@ struct HelpView: View {
                 "batch",
                 usage: "webappwrap batch <file.json> [--out <folder>]",
                 summary: "Creates every app listed in a JSON file (format below). The whole file is checked first; one failing app doesn’t stop the others. Exits with status 1 if any app failed.",
-                options: [.init("--out", "Folder the apps go in. Default /Applications.")],
+                options: [.init("--out", "Folder the apps go in. Defaults to the folder chosen in Settings, or /Applications.")],
                 example: "webappwrap batch ~/apps.json"
             )
 

@@ -180,57 +180,6 @@ extension BrowserWindowController: WKWebExtensionWindow {
 
 #endif
 
-/// An extension's button in the tab bar, with its badge (such as a count of blocked items).
-final class ExtensionToolbarButton: NSButton {
-    var onClick: (() -> Void)?
-    var badgeText = "" {
-        didSet { if badgeText != oldValue { needsDisplay = true } }
-    }
-
-    init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
-        isBordered = false
-        imagePosition = .imageOnly
-        imageScaling = .scaleProportionallyDown
-        target = self
-        action = #selector(clicked)
-        translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 28),
-            heightAnchor.constraint(equalToConstant: 28),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) is not supported")
-    }
-
-    override var mouseDownCanMoveWindow: Bool { false }
-
-    @objc private func clicked() {
-        onClick?()
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard !badgeText.isEmpty else { return }
-        let text = String(badgeText.prefix(4)) as NSString
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 8, weight: .semibold),
-            .foregroundColor: NSColor.white,
-        ]
-        let size = text.size(withAttributes: attributes)
-        let badge = NSRect(
-            x: bounds.maxX - size.width - 6, y: bounds.minY + 1,
-            width: size.width + 6, height: size.height + 1
-        )
-        NSColor.systemRed.setFill()
-        NSBezierPath(roundedRect: badge, xRadius: badge.height / 2, yRadius: badge.height / 2).fill()
-        text.draw(at: NSPoint(x: badge.minX + 3, y: badge.minY + 0.5), withAttributes: attributes)
-    }
-}
-
 /// The Extensions menu: each installed extension, whether it's on for this app, its toolbar
 /// button and options page, and a way to manage extensions in WebAppWrap. Rebuilt each time
 /// it opens.
@@ -258,7 +207,7 @@ final class ExtensionsMenuController: NSObject, NSMenuDelegate {
         menu.addItem(disabled("This app was built without extension support"))
         #endif
         menu.addItem(.separator())
-        menu.addItem(item("Manage Extensions in WebAppWrap…") { [weak self] in self?.openGenerator() })
+        menu.addItem(item("Manage Extensions in WebAppWrap…") { Self.openGenerator() })
     }
 
     #if compiler(>=6.1)
@@ -316,7 +265,8 @@ final class ExtensionsMenuController: NSObject, NSMenuDelegate {
     }
     #endif
 
-    private func openGenerator() {
+    /// Opens WebAppWrap, where extensions are installed and managed.
+    static func openGenerator() {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.generatorBundleID) else {
             NSSound.beep()
             return
@@ -337,7 +287,7 @@ final class ExtensionsMenuController: NSObject, NSMenuDelegate {
 }
 
 /// A menu item that runs a closure, for menus built on the fly.
-private final class ClosureMenuItem: NSMenuItem {
+final class ClosureMenuItem: NSMenuItem {
     private let handler: () -> Void
 
     init(title: String, handler: @escaping () -> Void) {

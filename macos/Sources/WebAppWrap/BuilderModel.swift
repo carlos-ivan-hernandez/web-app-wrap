@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import SwiftUI
 import WebAppWrapKit
 
@@ -28,6 +29,8 @@ final class BuilderModel: ObservableObject {
     }
 
     @Published var mode = Mode.oneOff
+    /// Where apps are saved. Change it with `chooseAppsFolder()`.
+    @Published private(set) var appsFolder = AppsFolder.current
     @Published private(set) var status: Status = .idle
     let oneOff: AppDraft
 
@@ -111,7 +114,7 @@ final class BuilderModel: ObservableObject {
     }
 
     func appURL(for record: AppRecord) -> URL {
-        record.settings.location.bundleURL(in: AppDraft.applicationsFolder)
+        record.settings.location.bundleURL(in: appsFolder)
     }
 
     func buildReason(for record: AppRecord) -> AppRecord.BuildReason? {
@@ -208,7 +211,7 @@ final class BuilderModel: ObservableObject {
         /// Why each target is built, as of when the page opened. Missing for up-to-date apps
         /// built by choice.
         let reasons: [UUID: AppRecord.BuildReason]
-        /// Targets already in Applications, which are moved to the Trash first.
+        /// Targets already in the apps folder, which are moved to the Trash first.
         let replacing: Set<UUID>
         /// How each target went, filled in as the build runs.
         var outcomes: [UUID: Outcome] = [:]
@@ -252,7 +255,7 @@ final class BuilderModel: ObservableObject {
         let targets = plan.targets
         let iconsFolder = registry.iconsFolder
         let jobs = targets.compactMap { record in record.batchEntry(iconsFolder: iconsFolder).map { (record, $0) } }
-        let root = AppDraft.applicationsFolder
+        let root = appsFolder
         let version = GeneratorVersion.commit
         status = .buildingList(current: 1, total: jobs.count, name: jobs.first?.1.location.name ?? "")
         Task {
@@ -305,6 +308,104 @@ final class BuilderModel: ObservableObject {
                 report.informativeText = saveError
                 report.runModal()
             }
+        }
+    }
+
+    // MARK: - Apps folder
+
+    /// Asks for a new folder to save apps in.
+    func chooseAppsFolder() {
+        guard !status.isBusy else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = appsFolder
+        panel.prompt = "Use This Folder"
+        panel.message = "Choose the folder WebAppWrap saves your apps in."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        setAppsFolder(url)
+    }
+
+    /// Saves apps in `folder` from now on. Apps in My Apps that are already built can move
+    /// along with it; otherwise Build Apps builds new copies there.
+    func setAppsFolder(_ folder: URL) {
+        let old = appsFolder
+        let new = folder.standardizedFileURL
+        guard !status.isBusy, new.path != old.standardizedFileURL.path else { return }
+
+        let fileManager = FileManager.default
+        let movable = records.filter { record in
+            fileManager.fileExists(atPath: record.settings.location.bundleURL(in: old).path)
+                && !fileManager.fileExists(atPath: record.settings.location.bundleURL(in: new).path)
+        }
+        var shouldMove = false
+        if !movable.isEmpty {
+            let count = movable.count == 1 ? "1 app" : "\(movable.count) apps"
+            let alert = NSAlert()
+            alert.messageText = "Move your apps to \(AppsFolder.displayPath(new))?"
+            alert.informativeText = """
+            \(count) from My Apps \(movable.count == 1 ? "is" : "are") in \(AppsFolder.displayPath(old)). \
+            Moving keeps their sign-ins and settings. If you don’t move them, they stay where they \
+            are, and Build Apps makes new copies in the new folder.
+            """
+            alert.addButton(withTitle: "Move Apps")
+            alert.addButton(withTitle: "Don’t Move")
+            alert.addButton(withTitle: "Cancel")
+            switch alert.runModal() {
+            case .alertFirstButtonReturn: shouldMove = true
+            case .alertSecondButtonReturn: break
+            default: return
+            }
+        }
+
+        AppsFolder.set(new)
+        appsFolder = AppsFolder.current
+        guard shouldMove else { return }
+        let failures = move(movable, from: old, to: new)
+        if !failures.isEmpty {
+            let report = NSAlert()
+            report.alertStyle = .warning
+            report.messageText = "Some apps couldn’t be moved"
+            report.informativeText = failures.joined(separator: "\n")
+                + "\n\nThey’re still in \(AppsFolder.displayPath(old)). Build Apps makes new copies in the new folder."
+            report.runModal()
+        }
+    }
+
+    /// Moves built apps between folders, keeping any subfolders in their names. Returns a
+    /// line for each app that couldn't be moved.
+    private func move(_ records: [AppRecord], from old: URL, to new: URL) -> [String] {
+        let fileManager = FileManager.default
+        var failures: [String] = []
+        for record in records {
+            let source = record.settings.location.bundleURL(in: old)
+            let destination = record.settings.location.bundleURL(in: new)
+            do {
+                try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fileManager.moveItem(at: source, to: destination)
+                _ = LSRegisterURL(destination as CFURL, true)
+                removeIfEmpty(source.deletingLastPathComponent(), within: old)
+            } catch {
+                failures.append("\(record.settings.location.name): \(error.localizedDescription)")
+            }
+        }
+        return failures
+    }
+
+    /// Removes a subfolder (such as /Applications/WebAppWrap) that moving left empty. Never
+    /// the apps folder itself.
+    private func removeIfEmpty(_ folder: URL, within root: URL) {
+        let fileManager = FileManager.default
+        var folder = folder.standardizedFileURL
+        let root = root.standardizedFileURL
+        while folder.path.hasPrefix(root.path + "/") {
+            guard let contents = try? fileManager.contentsOfDirectory(atPath: folder.path),
+                  contents.allSatisfy({ $0 == ".DS_Store" }),
+                  (try? fileManager.removeItem(at: folder)) != nil
+            else { return }
+            folder = folder.deletingLastPathComponent()
         }
     }
 

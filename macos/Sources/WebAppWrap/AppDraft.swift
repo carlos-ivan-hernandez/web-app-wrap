@@ -34,8 +34,6 @@ final class AppDraft: ObservableObject {
     @Published private(set) var imageFileName = ""
     @Published private(set) var imageError: String?
 
-    static let applicationsFolder = URL(fileURLWithPath: "/Applications", isDirectory: true)
-
     init() {}
 
     /// Starts from an app in the list. `iconURL` is where its stored icon is.
@@ -54,10 +52,10 @@ final class AppDraft: ObservableObject {
         }
     }
 
-    /// The name field may include folders: "WebAppWrap/Photos" -> /Applications/WebAppWrap/Photos.app.
+    /// The name field may include folders: "WebAppWrap/Photos" -> <apps folder>/WebAppWrap/Photos.app.
     var location: AppLocation { AppLocation(displayName) }
     var trimmedName: String { location.name }
-    var destination: URL { location.bundleURL(in: Self.applicationsFolder) }
+    var destination: URL { location.bundleURL(in: AppsFolder.current) }
     var normalizedURL: URL? { InputNormalizer.normalizeURL(urlString) }
     var isValid: Bool { !trimmedName.isEmpty && normalizedURL != nil }
 

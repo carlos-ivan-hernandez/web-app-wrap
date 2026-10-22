@@ -38,7 +38,7 @@ struct OneOffView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            AppForm(draft: draft) { model.createApp() }
+            AppForm(draft: draft, onSubmit: { model.createApp() }, onChangeFolder: { model.chooseAppsFolder() })
                 .disabled(model.status.isBusy)
             Divider()
             HStack(spacing: 10) {
@@ -52,6 +52,26 @@ struct OneOffView: View {
             .frame(minHeight: 28)
         }
         .padding(24)
+    }
+}
+
+/// "Apps are saved in <folder>", with a Change… link.
+struct AppsFolderCaption: View {
+    @ObservedObject var model: BuilderModel
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "folder").foregroundStyle(.secondary)
+            Text("Apps are saved in \(AppsFolder.displayPath(model.appsFolder))")
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(model.appsFolder.path)
+            Button("Change…") { model.chooseAppsFolder() }
+                .buttonStyle(.link)
+                .disabled(model.status.isBusy)
+        }
+        .font(.caption)
     }
 }
 

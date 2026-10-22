@@ -14,7 +14,8 @@ enum CommandLineInterface {
           --zoom adds to the automatic zoom that crops off an image's border.
           --no-auto-zoom uses the image as it is, border and all.
           The title bar color defaults to the site's theme color.
-          --out is the folder apps go in (default /Applications).
+          --out is the folder apps go in (default: the folder chosen in WebAppWrap's
+          Settings, or /Applications).
 
       WebAppWrap batch <file.json> [--out <folder>]
           Create every app listed in a JSON array of objects with the fields
@@ -80,7 +81,7 @@ enum CommandLineInterface {
         // --name may include folders, e.g. "WebAppWrap/Photos".
         let location = AppLocation(name)
         guard !location.name.isEmpty else { throw UsageError(message: "--name needs an app name after any folders.") }
-        let root = URL(fileURLWithPath: ((value("--out", in: options) ?? "/Applications") as NSString).expandingTildeInPath)
+        let root = URL(fileURLWithPath: ((value("--out", in: options) ?? AppsFolder.current.path) as NSString).expandingTildeInPath)
         let titleBarColor: HexColor
         if let raw = value("--title-bar-color", in: options) {
             guard let parsed = HexColor(hex: raw) else { throw UsageError(message: "--title-bar-color must look like #1E1E1E.") }
@@ -112,7 +113,7 @@ enum CommandLineInterface {
             throw UsageError(message: "Couldn’t read \(path).")
         }
         let entries = try BatchFile.parse(data, baseDirectory: file.deletingLastPathComponent())
-        let root = URL(fileURLWithPath: ((value("--out", in: options) ?? "/Applications") as NSString).expandingTildeInPath)
+        let root = URL(fileURLWithPath: ((value("--out", in: options) ?? AppsFolder.current.path) as NSString).expandingTildeInPath)
 
         let results = waitFor {
             await BatchBuilder.run(entries, into: root) { index, entry in

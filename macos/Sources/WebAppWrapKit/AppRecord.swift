@@ -3,7 +3,7 @@ import Foundation
 /// What an app in the list is made from. The same inputs as the window and a batch entry,
 /// except that the icon is a file WebAppWrap keeps in its own icons folder (see AppRegistry).
 public struct AppSettings: Codable, Equatable {
-    /// May include folders under Applications, as in the window: "WebAppWrap/Photos".
+    /// May include folders under the apps folder, as in the window: "WebAppWrap/Photos".
     public var name: String
     public var url: String
     /// File name in AppRegistry's icons folder. nil draws the default icon.
@@ -65,7 +65,7 @@ public struct AppRecord: Codable, Equatable, Identifiable {
             case .changed: "Changed since the last build"
             case .newVersion: "Built with another version of WebAppWrap"
             case .unknownVersion: "This WebAppWrap has no version, so it always rebuilds"
-            case .missing: "The app isn’t in Applications"
+            case .missing: "The app isn’t in the apps folder"
             }
         }
     }

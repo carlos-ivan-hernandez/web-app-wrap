@@ -13,11 +13,29 @@ Run the commands below from this `macos` folder.
 ## Tabs in generated apps
 
 The window has a single bar at the top, in the title-bar color you pick in
-WebAppWrap, with the close, minimize and zoom buttons on the left. With one tab
-open, that's all it shows. With two or more, tabs up to 240pt wide sit side by
-side, separated by thin dividers, and shrink to fit when there are many. Every
-tab uses the bar's color. The
-selected tab is marked by brighter text and its close button.
+WebAppWrap, with the close, minimize and zoom buttons on the left and a **⋮**
+(More) button on the right. With one tab open, that's all it shows. With two or
+more, tabs up to 240pt wide sit side by side, separated by thin dividers, and
+shrink to fit when there are many. Every tab uses the bar's color. The
+selected tab is marked by brighter text and its close button. If any extensions
+are on for the app, an **Extensions** button (a grid of four squares) sits next
+to ⋮.
+
+The **⋮** menu has:
+
+- **Open Link…** (⇧⌘L): paste a link, for example one copied from Chrome, and
+  open it in a new tab or the current one. The field starts with the link on
+  the clipboard, if there is one. The link opens in the app even if it's on
+  another site.
+- **History**: the 15 most recently visited pages (choose one to open it in the
+  current tab, or ⌘-choose for a new tab), and **Show All History** (⌘Y), a
+  searchable window of every visit grouped by day. Double-click a page there to
+  open it in a new tab; right-click to copy or remove it. **Clear History…**
+  removes them all without signing you out.
+- **Copy Page Link** and **Open Page in Browser**.
+
+Each app keeps its own history, up to 5,000 visits, in
+`~/Library/Application Support/<bundle ID>/history.json`.
 
 | Action | Result |
 | --- | --- |
@@ -27,6 +45,8 @@ selected tab is marked by brighter text and its close button.
 | ⌘W, or the tab's × (middle-click also works) | Closes the tab. Closing the last tab quits the app |
 | ⇧⌘W | Closes the window and all its tabs |
 | ⌘N | New window |
+| ⇧⌘L, or ⋮ → Open Link… | Open a pasted link |
+| ⌘Y, or ⋮ → History → Show All History | History window |
 | ⌘1 … ⌘8, ⌘9 | Go to tab N, or to the last tab |
 | ⌘H / ⌘L | Previous / next tab (⌃⇧⇥ / ⌃⇥ and ⇧⌘[ / ⇧⌘] also work) |
 | Drag a tab sideways | Reorder tabs |
@@ -88,7 +108,7 @@ single app right now, and **My Apps** keeps a list of your apps and builds them.
 
 1. Choose **One-Off** at the top of the window.
 2. Enter the app name and the web address. To save the app in a subfolder of
-   Applications, put the folder in the name: `WebAppWrap/Photos` creates
+   your apps folder, put the folder in the name: `WebAppWrap/Photos` creates
    `/Applications/WebAppWrap/Photos.app`, and the app is named "Photos". You can leave out `https://`.
    Addresses that start with `localhost` use `http://`.
 3. Optionally, drop a square image on the icon area or click **Choose Image…**.
@@ -105,9 +125,10 @@ single app right now, and **My Apps** keeps a list of your apps and builds them.
    web app manifest. You can pick a different color, and **Use Site Color**
    switches back. If the site has no theme color, WebAppWrap uses `#1C1C1C`. The text
    switches between light and dark to stay readable.
-5. Click **Create App**. WebAppWrap saves the app in `/Applications`. If an app with
-   that name is already there, WebAppWrap asks before replacing it and moves the old
-   copy to the Trash.
+5. Click **Create App**. WebAppWrap saves the app in your apps folder
+   (`/Applications` unless you change it; see below). If an app with that name
+   is already there, WebAppWrap asks before replacing it and moves the old copy
+   to the Trash.
 
 The app is also added to **My Apps**, or updates the entry there with the same
 name.
@@ -128,7 +149,7 @@ apps in it.
 - Right-click an app to build just that one, open it, or show it in Finder.
 - **Build Apps** opens a page listing every app that needs building, why
   (for example, its settings changed), and whether it creates a new app or
-  replaces one in Applications. Nothing is built until you click **Build**
+  replaces one in the apps folder. Nothing is built until you click **Build**
   there; **Back** returns to the list. Each app's progress and result show on
   the same page, and **Done** returns to the list.
 
@@ -138,7 +159,7 @@ An app is **skipped** when both of these are true:
   since it was last built.
 - It was last built by this version of WebAppWrap.
 
-It's also rebuilt if it's no longer in Applications. So after you update
+It's also rebuilt if it's no longer in the apps folder. So after you update
 WebAppWrap, **Build Apps** rebuilds all your apps with the new version.
 
 WebAppWrap's version is the git commit it was built from. `scripts/build.sh`
@@ -148,6 +169,21 @@ the bottom of My Apps and in Help. Each app WebAppWrap creates gets the same key
 in its own `Info.plist`, so you can see which version built it. A WebAppWrap with
 no version (run with `swift run`, or built outside a git checkout) rebuilds
 every app every time.
+
+### The apps folder
+
+Apps are saved in `/Applications` unless you pick another folder, for example
+`~/Applications/Web Apps`. Change it in **WebAppWrap → Settings** (⌘,), with
+**Change…** under the My Apps list, or with **Change Folder…** next to "Saves
+to" in One-Off. Folders in an app's name go inside it.
+
+When you change it, WebAppWrap offers to move the apps in My Apps that are
+already built. Moving keeps their sign-ins and settings, and removes any
+subfolders the move leaves empty. If you don't move them, they stay where they
+are, and **Build Apps** makes new copies in the new folder.
+
+The command line uses the same folder unless you pass `--out`. The choice is
+stored in WebAppWrap's defaults (`defaults read com.waw.WebAppWrap AppsFolder`).
 
 #### Where the list and icons are kept
 
@@ -185,10 +221,13 @@ A new extension is on for all apps. To change that, double-click it (or click
 **Choose Apps…**): turn the default off, or turn it on or off for individual
 apps. An app's **Edit** sheet in My Apps has the same switches.
 
-Each app also has an **Extensions** menu. There you can turn an extension on or
-off for that app, click its toolbar button, or open its options. Extension
-buttons appear at the right end of the tab bar, and their popups open under
-them.
+Each app also has an **Extensions** menu in the menu bar. There you can turn an
+extension on or off for that app, click its toolbar button, or open its
+options. In the window, extensions are tucked behind the **Extensions** button
+at the right end of the tab bar, like Chrome's extensions menu. Choosing one
+there clicks its toolbar button, and its popup opens under the Extensions
+button. Badges (such as a count of blocked items) show next to each
+extension's name.
 
 Changes never need a rebuild. A running app loads and unloads extensions the
 next time you switch to it. Installing a newer version (importing again, or
@@ -244,7 +283,7 @@ inputs as the window:
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `name` | yes | App name. It may include folders under Applications, as in the window |
+| `name` | yes | App name. It may include folders under the apps folder, as in the window |
 | `url` | yes | Web address |
 | `image` | no | Icon image path, relative to the JSON file unless absolute (`~` works). Without it, WebAppWrap draws the default icon |
 | `zoom` | no | 1–3, applied on top of the automatic zoom that crops off a border. Defaults to 1 |
@@ -271,7 +310,7 @@ the end without stopping the rest.
 ```bash
 wrap="/Applications/WebAppWrap.app/Contents/MacOS/WebAppWrap"
 "$wrap" build --name "WebAppWrap/Linear" --url linear.app
-"$wrap" build --name "Grafana" --url localhost:3000 --image ~/grafana.png --zoom 1.2 --title-bar-color "#1a1a1a" --out ~/Applications
+"$wrap" build --name "Grafana" --url localhost:3000 --image ~/grafana.png --zoom 1.2 --title-bar-color "#1a1a1a" --out ~/Applications # --out defaults to the apps folder
 "$wrap" batch ~/apps.json                      # every app in a JSON file
 "$wrap" icon --name "Linear" --out Linear.icns # just the icon
 ```

@@ -88,6 +88,8 @@ struct AppListView: View {
             .controlSize(.small)
             .disabled(model.status.isBusy || model.loadError != nil)
 
+            AppsFolderCaption(model: model)
+
             Divider()
 
             HStack(spacing: 10) {
@@ -130,7 +132,7 @@ struct AppListView: View {
         guard !model.status.isBusy, let record = model.findRecord(id) else { return }
         let alert = NSAlert()
         alert.messageText = "Remove \(record.settings.location.name) from the list?"
-        alert.informativeText = "The app stays in Applications. Its icon is moved to the previous-icons folder."
+        alert.informativeText = "The app itself stays installed. Its icon is moved to the previous-icons folder."
         alert.addButton(withTitle: "Remove")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }

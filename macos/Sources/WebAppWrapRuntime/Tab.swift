@@ -33,16 +33,28 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
             webView.isInspectable = true
         }
 
-        let notifyHost: (Any, Any) -> Void = { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.host?.tabDidChange(self)
+        // KVO calls these on the main thread, outside the main actor's knowledge.
+        let onChange: (@escaping @MainActor (Tab) -> Void) -> (Any, Any) -> Void = { [weak self] action in
+            { _, _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    action(self)
+                }
             }
         }
+        let titleChanged = onChange { tab in
+            tab.host?.tabDidChange(tab)
+            tab.historyTitleDidChange()
+        }
+        let loadingChanged = onChange { tab in tab.host?.tabDidChange(tab) }
+        let urlChanged = onChange { tab in
+            tab.host?.tabDidChange(tab)
+            tab.urlDidChange()
+        }
         observations = [
-            webView.observe(\.title) { notifyHost($0, $1) },
-            webView.observe(\.isLoading) { notifyHost($0, $1) },
-            webView.observe(\.url) { notifyHost($0, $1) },
+            webView.observe(\.title) { titleChanged($0, $1) },
+            webView.observe(\.isLoading) { loadingChanged($0, $1) },
+            webView.observe(\.url) { urlChanged($0, $1) },
         ]
     }
 
@@ -75,6 +87,19 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
             guard let self else { return }
             self.host?.closeTab(self)
         }
+    }
+
+    // MARK: - History
+
+    /// Full page loads are recorded when they commit (see didCommit). An address change while
+    /// nothing is loading is a single-page app moving to another page, so it's a visit too.
+    private func urlDidChange() {
+        guard !webView.isLoading else { return }
+        appDelegate.history.recordVisit(url: webView.url, title: webView.title)
+    }
+
+    private func historyTitleDidChange() {
+        appDelegate.history.updateTitle(webView.title, for: webView.url)
     }
 
     // MARK: - Page commands
@@ -195,6 +220,10 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     // MARK: - Load results
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        appDelegate.history.recordVisit(url: webView.url, title: webView.title)
+    }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if webView.url?.scheme != "about" { lastFailedURL = nil }

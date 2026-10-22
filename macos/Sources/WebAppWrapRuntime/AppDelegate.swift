@@ -16,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private(set) var config: WrapperConfig!
     let downloads = DownloadManager()
+    /// Pages visited in this app, shown in the More menu and the History window.
+    let history = HistoryController()
+    private var historyWindow: HistoryWindowController?
     private var windowControllers: [BrowserWindowController] = []
     /// An ExtensionHost on macOS 15.4 and later (stored untyped so the app still runs on older systems).
     private var extensionHostStorage: AnyObject?
@@ -101,6 +104,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func extensionsDidChange() {
         windowControllers.forEach { $0.refreshExtensionToolbar() }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        history.saveNow()
     }
 
     /// Closing the last tab (cmd+W) quits the app.
@@ -189,5 +196,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func newTab(_ sender: Any?) {
         openWindow()
+    }
+
+    /// The History window. Opening a page from it adds a tab to the front browser window.
+    @objc func showHistory(_ sender: Any?) {
+        if historyWindow == nil {
+            historyWindow = HistoryWindowController(history: history, appName: config.appName) { [weak self] url in
+                guard let self else { return }
+                if let controller = self.frontWindowController {
+                    controller.openTab(url: url)
+                    controller.showWindow(nil)
+                } else {
+                    self.openWindow(url: url)
+                }
+            }
+        }
+        historyWindow?.showWindow(nil)
     }
 }

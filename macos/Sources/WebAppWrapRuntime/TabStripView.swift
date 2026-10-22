@@ -18,7 +18,7 @@ struct StripPalette {
 }
 
 /// The bar at the top of the window: room for the traffic lights, then the tabs and a "+",
-/// and on the right any extension toolbar buttons (`trailingAccessory`).
+/// and on the right the Extensions and More buttons (`trailingAccessory`).
 /// With a single tab it's just a plain title bar. With more, tabs up to 240pt wide (shrinking
 /// to fit when there are many) sit side by side between thin dividers. Empty space drags the
 /// window and double-click zooms it. Tabs can be dragged sideways to reorder them.
@@ -42,7 +42,7 @@ final class TabStripView: NSView {
         didSet { applyPalette() }
     }
 
-    /// Shown at the right end of the bar, sized to fit. Used for extension buttons.
+    /// Shown at the right end of the bar, sized to fit. Holds the Extensions and More buttons.
     var trailingAccessory: NSView? {
         didSet {
             oldValue?.removeFromSuperview()
@@ -375,4 +375,109 @@ private final class TabItemView: NSView {
     @objc private func closeClicked() {
         onClose?()
     }
+}
+
+/// A borderless button at the right end of the tab bar (the Extensions and More menus), with a
+/// soft highlight while the mouse is over it or its menu is open.
+final class TitleBarButton: NSButton {
+    var onPress: ((TitleBarButton) -> Void)?
+    /// The highlight is drawn in this color, faintly. Set to the bar's text color.
+    var hoverColor: NSColor = .white {
+        didSet { needsDisplay = true }
+    }
+
+    private var isHovered = false {
+        didSet { if isHovered != oldValue { needsDisplay = true } }
+    }
+    private var isShowingMenu = false {
+        didSet { needsDisplay = true }
+    }
+
+    static let size: CGFloat = 28
+
+    init(image: NSImage?, label: String) {
+        super.init(frame: NSRect(x: 0, y: 0, width: Self.size, height: Self.size))
+        self.image = image
+        toolTip = label
+        setAccessibilityLabel(label)
+        isBordered = false
+        imagePosition = .imageOnly
+        imageScaling = .scaleProportionallyDown
+        target = self
+        action = #selector(pressed)
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: Self.size),
+            heightAnchor.constraint(equalToConstant: Self.size),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self
+        ))
+    }
+
+    override func mouseEntered(with event: NSEvent) { isHovered = true }
+    override func mouseExited(with event: NSEvent) { isHovered = false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        if isHovered || isShowingMenu {
+            hoverColor.withAlphaComponent(isShowingMenu ? 0.16 : 0.1).setFill()
+            NSBezierPath(roundedRect: bounds.insetBy(dx: 2, dy: 2), xRadius: 6, yRadius: 6).fill()
+        }
+        super.draw(dirtyRect)
+    }
+
+    @objc private func pressed() {
+        onPress?(self)
+    }
+
+    /// Shows `menu` just below the button, right-aligned with it, like a browser's toolbar
+    /// menus. Returns once the menu closes.
+    func popUp(_ menu: NSMenu) {
+        isShowingMenu = true
+        let x = bounds.maxX - menu.size.width
+        let y = isFlipped ? bounds.maxY + 4 : bounds.minY - 4
+        menu.popUp(positioning: nil, at: NSPoint(x: x, y: y), in: self)
+        isShowingMenu = false
+        // The mouse may have left while the menu was open, which sends no mouseExited.
+        if let window {
+            isHovered = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
+        }
+    }
+
+    /// Three vertical dots (a "kebab"), drawn here because SF Symbols' ellipsis is horizontal.
+    static let kebabImage: NSImage = {
+        let image = NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in
+            NSColor.black.setFill()
+            let dot: CGFloat = 3.2
+            for offset in [-5.0, 0.0, 5.0] {
+                NSBezierPath(ovalIn: NSRect(
+                    x: rect.midX - dot / 2, y: rect.midY - dot / 2 + CGFloat(offset),
+                    width: dot, height: dot
+                )).fill()
+            }
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "More"
+        return image
+    }()
+
+    /// A grid of four rounded squares: "add-ons", without Chrome's puzzle piece.
+    static let extensionsImage = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "Extensions")?
+        .withSymbolConfiguration(.init(pointSize: 13, weight: .regular))
 }

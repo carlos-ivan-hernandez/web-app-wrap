@@ -36,6 +36,16 @@ have them yet:
       `AreBrowserExtensionsEnabled`), but it has no toolbar or popups and less
       API coverage, so per-tab and window APIs and toolbar buttons may not be
       possible. Stamp each app's list ID into its `app.json`.
+- [ ] **Extensions menu.** Put extensions behind one title-bar button (a grid
+      of four squares, not a puzzle piece) instead of a row of buttons.
+- [ ] **More (⋮) menu** at the right of the title bar, with **Open Link…**
+      (Ctrl+Shift+L; prefilled from the clipboard, opens in a new or the
+      current tab), a **History** submenu of recent pages, **Show All History**
+      (Ctrl+H) and the page commands. Keep each app's history in its own
+      `history.json`, in the same format as macOS (`BrowsingHistory.swift`).
+- [ ] **Apps folder setting.** Let the user pick the folder apps are saved in
+      (default: today's install folder), offer to move already-built apps when
+      it changes, and use it as `waw`'s default `--out`.
 
 On macOS, the code to follow is:
 
@@ -43,6 +53,11 @@ On macOS, the code to follow is:
   list format, skip rules and icon storage
 - `macos/Sources/WebAppWrap/BuilderModel.swift`, `AppListView.swift`
 - `macos/scripts/build.sh`: stamping the commit
+- `macos/Sources/WebAppWrapKit/BrowsingHistory.swift` and
+  `macos/Sources/WebAppWrapRuntime/History.swift`: history; the ⋮ and
+  Extensions menus are in `BrowserWindowController.swift`
+- `macos/Sources/WebAppWrap/AppsFolder.swift` and `BuilderModel.setAppsFolder`:
+  the apps folder
 - `macos/Sources/WebAppWrapKit/ExtensionStore.swift`, `ExtensionManifest.swift`,
   `macos/Sources/WebAppWrap/ExtensionsModel.swift`, `ExtensionsView.swift`, and
   `macos/Sources/WebAppWrapRuntime/ExtensionHost.swift`, `ExtensionSupport.swift`

@@ -42,6 +42,7 @@ enum MainMenu {
         let menu = NSMenu()
         menu.addItem(item("New Tab", #selector(BrowserWindowController.newTab(_:)), "t"))
         menu.addItem(item("New Window", #selector(AppDelegate.newWindow(_:)), "n"))
+        menu.addItem(item("Open Link…", #selector(BrowserWindowController.openLink(_:)), "l", [.command, .shift]))
         menu.addItem(.separator())
         menu.addItem(item("Close Tab", #selector(BrowserWindowController.closeCurrentTab(_:)), "w"))
         menu.addItem(item("Close Window", #selector(BrowserWindowController.closeWindow(_:)), "w", [.command, .shift]))
@@ -82,6 +83,8 @@ enum MainMenu {
         menu.addItem(item("Back", #selector(BrowserWindowController.navigateBack(_:)), "["))
         menu.addItem(item("Forward", #selector(BrowserWindowController.navigateForward(_:)), "]"))
         menu.addItem(item("Home", #selector(BrowserWindowController.goHome(_:)), "h", [.command, .shift]))
+        menu.addItem(.separator())
+        menu.addItem(item("Show All History", #selector(AppDelegate.showHistory(_:)), "y"))
         return menu
     }
 
