@@ -406,10 +406,37 @@ final class TitleBarButton: NSButton {
         target = self
         action = #selector(pressed)
         translatesAutoresizingMaskIntoConstraints = false
+        widthConstraint = widthAnchor.constraint(equalToConstant: Self.size)
         NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: Self.size),
+            widthConstraint,
             heightAnchor.constraint(equalToConstant: Self.size),
         ])
+    }
+
+    private var widthConstraint: NSLayoutConstraint!
+
+    /// Shows `text` after the image (the profile button), or just the image when nil.
+    func setText(_ text: String?, color: NSColor) {
+        if let text, !text.isEmpty {
+            attributedTitle = NSAttributedString(string: text, attributes: [
+                .foregroundColor: color,
+                .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            ])
+            imagePosition = .imageLeading
+            widthConstraint.isActive = false
+        } else {
+            title = ""
+            imagePosition = .imageOnly
+            widthConstraint.isActive = true
+        }
+        invalidateIntrinsicContentSize()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        var size = super.intrinsicContentSize
+        if imagePosition != .imageOnly { size.width += 16 }
+        size.height = Self.size
+        return size
     }
 
     @available(*, unavailable)
@@ -476,6 +503,9 @@ final class TitleBarButton: NSButton {
         image.accessibilityDescription = "More"
         return image
     }()
+
+    static let profileImage = NSImage(systemSymbolName: "person.crop.circle", accessibilityDescription: "Profile")?
+        .withSymbolConfiguration(.init(pointSize: 13, weight: .regular))
 
     /// A grid of four rounded squares: "add-ons", without Chrome's puzzle piece.
     static let extensionsImage = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "Extensions")?

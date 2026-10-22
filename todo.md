@@ -52,6 +52,17 @@ have them yet:
 - [ ] **Apps folder setting.** Let the user pick the folder apps are saved in
       (default: today's install folder), offer to move already-built apps when
       it changes, and use it as `waw`'s default `--out`.
+- [ ] **Downloads that can't be saved** to Downloads ask where to save instead
+      of failing.
+- [ ] **Notifications**: show the site's web notifications as Windows
+      notifications, with a ⋮ → Notifications switch, and bring the tab forward
+      when one is clicked. WebView2 has `CoreWebView2.NotificationReceived`
+      (WebView2 1.0.2420+); on macOS a page script stands in for the API.
+- [ ] **Profiles**: separate logins and site data per window (⋮ → Profile, New
+      Profile…, Manage Profiles…), with the profile name in the title bar once
+      there's more than one. WebView2 profiles: `CoreWebView2ControllerOptions.ProfileName`.
+- [ ] **Keyboard Shortcuts…** in the ⋮ menu: change any command's shortcut,
+      stored per app.
 
 On macOS, the code to follow is:
 
@@ -64,6 +75,8 @@ On macOS, the code to follow is:
   Extensions menus are in `BrowserWindowController.swift`
 - `macos/Sources/WebAppWrap/AppsFolder.swift` and `BuilderModel.setAppsFolder`:
   the apps folder
+- `macos/Sources/WebAppWrapRuntime/DownloadManager.swift`, `NotificationBridge.swift`,
+  `Profiles.swift`, `Shortcuts.swift` and `ShortcutsWindow.swift`
 - `macos/Sources/WebAppWrapKit/ExtensionStore.swift`, `ExtensionManifest.swift`,
   `macos/Sources/WebAppWrap/ExtensionsModel.swift`, `ExtensionsView.swift`, and
   `macos/Sources/WebAppWrapRuntime/ExtensionHost.swift`, `ExtensionSupport.swift`

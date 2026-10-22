@@ -4,20 +4,21 @@ import AppKit
 /// the responder chain, so tab actions land on the key tab's BrowserWindowController.
 @MainActor
 enum MainMenu {
-    static func install(appName: String, extensionsMenuDelegate: NSMenuDelegate) {
+    /// Builds the menu bar. Called again whenever a keyboard shortcut changes.
+    static func install(appName: String, extensionsMenuDelegate: NSMenuDelegate, shortcuts: ShortcutStore) {
         let menuBar = NSMenu()
-        let windowMenu = makeWindowMenu()
+        let windowMenu = makeWindowMenu(shortcuts)
 
-        menuBar.addItem(submenu(appName, makeAppMenu(appName: appName)))
-        menuBar.addItem(submenu("File", makeFileMenu()))
+        menuBar.addItem(submenu(appName, makeAppMenu(appName: appName, shortcuts)))
+        menuBar.addItem(submenu("File", makeFileMenu(shortcuts)))
         menuBar.addItem(submenu("Edit", makeEditMenu()))
-        menuBar.addItem(submenu("View", makeViewMenu()))
-        menuBar.addItem(submenu("History", makeHistoryMenu()))
+        menuBar.addItem(submenu("View", makeViewMenu(shortcuts)))
+        menuBar.addItem(submenu("History", makeHistoryMenu(shortcuts)))
         let extensionsMenu = NSMenu()
         // Filled in each time it opens.
         extensionsMenu.delegate = extensionsMenuDelegate
         menuBar.addItem(submenu("Extensions", extensionsMenu))
-        menuBar.addItem(submenu("Developer", makeDeveloperMenu()))
+        menuBar.addItem(submenu("Developer", makeDeveloperMenu(shortcuts)))
         menuBar.addItem(submenu("Window", windowMenu))
 
         NSApp.mainMenu = menuBar
@@ -25,33 +26,40 @@ enum MainMenu {
         NSApp.windowsMenu = windowMenu
     }
 
-    private static func makeAppMenu(appName: String) -> NSMenu {
+    /// Adds a command's items (see ShortcutStore.menuItems).
+    private static func add(_ id: String, to menu: NSMenu, _ shortcuts: ShortcutStore, title: String? = nil) {
+        for item in shortcuts.menuItems(for: id, title: title) { menu.addItem(item) }
+    }
+
+    private static func makeAppMenu(appName: String, _ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("About \(appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), ""))
+        add("about", to: menu, shortcuts, title: "About \(appName)")
         menu.addItem(.separator())
-        // ⌘H is taken by Show Previous Tab, so Hide has no shortcut.
-        menu.addItem(item("Hide \(appName)", #selector(NSApplication.hide(_:)), ""))
-        menu.addItem(item("Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]))
-        menu.addItem(item("Show All", #selector(NSApplication.unhideAllApplications(_:)), ""))
+        add("keyboardShortcuts", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Quit \(appName)", #selector(NSApplication.terminate(_:)), "q"))
+        add("hide", to: menu, shortcuts, title: "Hide \(appName)")
+        add("hideOthers", to: menu, shortcuts)
+        add("showAll", to: menu, shortcuts)
+        menu.addItem(.separator())
+        add("quit", to: menu, shortcuts, title: "Quit \(appName)")
         return menu
     }
 
-    private static func makeFileMenu() -> NSMenu {
+    private static func makeFileMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("New Tab", #selector(BrowserWindowController.newTab(_:)), "t"))
-        menu.addItem(item("New Window", #selector(AppDelegate.newWindow(_:)), "n"))
-        menu.addItem(item("Open Link…", #selector(BrowserWindowController.openLink(_:)), "l", [.command, .shift]))
+        add("newTab", to: menu, shortcuts)
+        add("newWindow", to: menu, shortcuts)
+        add("openLink", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Close Tab", #selector(BrowserWindowController.closeCurrentTab(_:)), "w"))
-        menu.addItem(item("Close Window", #selector(BrowserWindowController.closeWindow(_:)), "w", [.command, .shift]))
+        add("closeTab", to: menu, shortcuts)
+        add("closeWindow", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Copy Page Link", #selector(BrowserWindowController.copyPageURL(_:)), "c", [.command, .shift]))
-        menu.addItem(item("Open Page in Browser", #selector(BrowserWindowController.openPageInBrowser(_:)), "o", [.command, .shift]))
+        add("copyPageLink", to: menu, shortcuts)
+        add("openInBrowser", to: menu, shortcuts)
         return menu
     }
 
+    /// Standard text editing; these shortcuts can't be changed.
     private static func makeEditMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(item("Undo", Selector(("undo:")), "z"))
@@ -66,65 +74,48 @@ enum MainMenu {
         return menu
     }
 
-    private static func makeViewMenu() -> NSMenu {
+    private static func makeViewMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("Reload Page", #selector(BrowserWindowController.reloadPage(_:)), "r"))
+        add("reload", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Actual Size", #selector(BrowserWindowController.resetPageZoom(_:)), "0"))
-        menu.addItem(item("Zoom In", #selector(BrowserWindowController.zoomInPage(_:)), "="))
-        menu.addItem(item("Zoom Out", #selector(BrowserWindowController.zoomOutPage(_:)), "-"))
+        add("actualSize", to: menu, shortcuts)
+        add("zoomIn", to: menu, shortcuts)
+        add("zoomOut", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
+        add("fullScreen", to: menu, shortcuts)
         return menu
     }
 
-    private static func makeHistoryMenu() -> NSMenu {
+    private static func makeHistoryMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("Back", #selector(BrowserWindowController.navigateBack(_:)), "["))
-        menu.addItem(item("Forward", #selector(BrowserWindowController.navigateForward(_:)), "]"))
-        menu.addItem(item("Home", #selector(BrowserWindowController.goHome(_:)), "h", [.command, .shift]))
+        add("back", to: menu, shortcuts)
+        add("forward", to: menu, shortcuts)
+        add("home", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Show All History", #selector(AppDelegate.showHistory(_:)), "y"))
+        add("showHistory", to: menu, shortcuts)
         return menu
     }
 
-    private static func makeDeveloperMenu() -> NSMenu {
+    private static func makeDeveloperMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("Show Web Inspector", #selector(BrowserWindowController.showWebInspector(_:)), "i", [.command, .option]))
-        menu.addItem(item("Reload Ignoring Cache", #selector(BrowserWindowController.reloadIgnoringCache(_:)), "r", [.command, .option]))
+        add("webInspector", to: menu, shortcuts)
+        add("reloadIgnoringCache", to: menu, shortcuts)
         return menu
     }
 
-    private static func makeWindowMenu() -> NSMenu {
+    private static func makeWindowMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu(title: "Window")
-        menu.addItem(item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"))
-        menu.addItem(item("Zoom", #selector(NSWindow.performZoom(_:)), ""))
+        add("minimize", to: menu, shortcuts)
+        add("zoom", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Show Previous Tab", #selector(BrowserWindowController.showPreviousTab(_:)), "h"))
-        menu.addItem(item("Show Next Tab", #selector(BrowserWindowController.showNextTab(_:)), "l"))
-        menu.addItem(hidden(item("Previous Tab", #selector(BrowserWindowController.showPreviousTab(_:)), "{")))
-        menu.addItem(hidden(item("Next Tab", #selector(BrowserWindowController.showNextTab(_:)), "}")))
-
-        // Browser-style alternates (ctrl+tab, ctrl+shift+tab) and cmd+1 ... cmd+9, without cluttering the menu.
-        let backTab = String(UnicodeScalar(UInt8(NSBackTabCharacter)))
-        menu.addItem(hidden(item("Next Tab", #selector(BrowserWindowController.showNextTab(_:)), "\t", .control)))
-        menu.addItem(hidden(item("Previous Tab", #selector(BrowserWindowController.showPreviousTab(_:)), backTab, [.control, .shift])))
-        for number in 1...9 {
-            let title = number == 9 ? "Select Last Tab" : "Select Tab \(number)"
-            let tabItem = item(title, #selector(BrowserWindowController.selectTabByNumber(_:)), "\(number)")
-            tabItem.tag = number
-            menu.addItem(hidden(tabItem))
-        }
-
+        add("previousTab", to: menu, shortcuts)
+        add("nextTab", to: menu, shortcuts)
+        // ⌘1 ... ⌘9, without cluttering the menu.
+        for number in 1...8 { add("selectTab\(number)", to: menu, shortcuts) }
+        add("selectLastTab", to: menu, shortcuts)
         menu.addItem(.separator())
-        menu.addItem(item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:)), ""))
+        add("bringAllToFront", to: menu, shortcuts)
         return menu
-    }
-
-    private static func hidden(_ item: NSMenuItem) -> NSMenuItem {
-        item.isHidden = true
-        item.allowsKeyEquivalentWhenHidden = true
-        return item
     }
 
     private static func submenu(_ title: String, _ menu: NSMenu) -> NSMenuItem {

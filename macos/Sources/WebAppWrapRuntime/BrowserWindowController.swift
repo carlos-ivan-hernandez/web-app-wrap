@@ -21,11 +21,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let accessoryStack = NSStackView()
     private let extensionsButton = TitleBarButton(image: TitleBarButton.extensionsImage, label: "Extensions")
     private let moreButton = TitleBarButton(image: TitleBarButton.kebabImage, label: "More")
+    /// Names this window's profile; shown once the app has more than one.
+    private let profileButton = TitleBarButton(image: TitleBarButton.profileImage, label: "Profile")
+    private let palette: StripPalette
+    /// The profile whose logins and site data this window's tabs use.
+    let profileID: UUID
     /// How many recent pages the More menu's History submenu lists.
     private static let recentHistoryCount = 15
 
-    init(appDelegate: AppDelegate) {
+    init(appDelegate: AppDelegate, profileID: UUID) {
         self.appDelegate = appDelegate
+        self.profileID = profileID
+        self.palette = StripPalette(color: appDelegate.config.titleBarColor)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 860),
@@ -65,7 +72,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         ])
 
         tabStrip.leadingInset = Self.stripInsetForTrafficLights
-        let palette = StripPalette(color: appDelegate.config.titleBarColor)
         tabStrip.palette = palette
         window.backgroundColor = palette.background
         tabStrip.onSelect = { [weak self] index in
@@ -83,7 +89,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
         accessoryStack.orientation = .horizontal
         accessoryStack.spacing = 0
-        for button in [extensionsButton, moreButton] {
+        for button in [profileButton, extensionsButton, moreButton] {
             button.contentTintColor = palette.foreground.withAlphaComponent(0.7)
             button.hoverColor = palette.foreground
             accessoryStack.addArrangedSubview(button)
@@ -91,7 +97,52 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         extensionsButton.isHidden = true
         extensionsButton.onPress = { [weak self] button in self?.showExtensionsMenu(from: button) }
         moreButton.onPress = { [weak self] button in self?.showMoreMenu(from: button) }
+        profileButton.onPress = { [weak self] button in
+            guard let self else { return }
+            button.popUp(self.makeProfileMenu())
+        }
         tabStrip.trailingAccessory = accessoryStack
+        refreshProfile()
+    }
+
+    // MARK: - Profile
+
+    /// Shows the profile's name in the title bar while the app has more than one profile.
+    func refreshProfile() {
+        let profiles = appDelegate.profiles
+        let shows = profiles.hasSeveral
+        let name = profiles.name(of: profileID)
+        profileButton.setText(shows ? (name.count > 24 ? String(name.prefix(23)) + "…" : name) : nil,
+                              color: palette.foreground.withAlphaComponent(0.85))
+        profileButton.toolTip = "Profile: \(name)"
+        if profileButton.isHidden == shows {
+            profileButton.isHidden = !shows
+        }
+        tabStrip.needsLayout = true
+    }
+
+    /// Each profile (choosing one shows its window, or opens one), then New Profile and Manage Profiles.
+    private func makeProfileMenu() -> NSMenu {
+        let menu = NSMenu()
+        let profiles = appDelegate.profiles
+        for profile in profiles.list {
+            let id = profile.id
+            let item = ClosureMenuItem(title: profile.name) { [weak self] in
+                self?.appDelegate.showProfile(id)
+            }
+            item.state = id == profileID ? .on : .off
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        if Profiles.isSupported {
+            menu.addItem(menuItem("New Profile…", #selector(AppDelegate.newProfile(_:)), ""))
+        } else {
+            let unsupported = NSMenuItem(title: "More profiles need macOS 14 or later", action: nil, keyEquivalent: "")
+            unsupported.isEnabled = false
+            menu.addItem(unsupported)
+        }
+        menu.addItem(menuItem("Manage Profiles…", #selector(AppDelegate.showProfiles(_:)), ""))
+        return menu
     }
 
     @available(*, unavailable)
@@ -114,7 +165,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     ) -> Tab {
         let tab = Tab(
             appDelegate: appDelegate,
-            configuration: configuration ?? appDelegate.makeWebViewConfiguration()
+            configuration: configuration ?? appDelegate.makeWebViewConfiguration(profile: profileID)
         )
         tab.host = self
         // Lay the page out at the real size even while it loads in the background.
@@ -275,10 +326,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     // MARK: - More menu, Open Link and History
 
-    /// The kebab menu: open a link, recent history, and page commands.
+    /// The kebab menu: open a link, recent history, sites, notifications, profiles, shortcuts
+    /// and page commands.
     private func showMoreMenu(from button: TitleBarButton) {
         let menu = NSMenu()
-        menu.addItem(menuItem("Open Link…", #selector(openLink(_:)), "l", [.command, .shift]))
+        let shortcuts = appDelegate.shortcuts
+        menu.addItem(shortcuts.menuItem(for: "openLink"))
         let historyItem = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
         historyItem.submenu = makeHistoryMenu()
         menu.addItem(historyItem)
@@ -288,8 +341,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         menu.addItem(allowAll)
         menu.addItem(menuItem("Allowed Sites…", #selector(AppDelegate.showAllowedSites(_:)), ""))
         menu.addItem(.separator())
-        menu.addItem(menuItem("Copy Page Link", #selector(copyPageURL(_:)), "c", [.command, .shift]))
-        menu.addItem(menuItem("Open Page in Browser", #selector(openPageInBrowser(_:)), "o", [.command, .shift]))
+        let notifications = appDelegate.notifications!
+        let notify = menuItem("Notifications", #selector(AppDelegate.toggleNotifications(_:)), "")
+        notify.state = notifications.isEnabled && notifications.isAllowedBySystem ? .on : .off
+        notify.toolTip = "Shows the site’s notifications in macOS Notification Center."
+        menu.addItem(notify)
+        let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
+        profileItem.submenu = makeProfileMenu()
+        menu.addItem(profileItem)
+        menu.addItem(shortcuts.menuItem(for: "keyboardShortcuts"))
+        menu.addItem(.separator())
+        menu.addItem(shortcuts.menuItem(for: "copyPageLink"))
+        menu.addItem(shortcuts.menuItem(for: "openInBrowser"))
         button.popUp(menu)
     }
 
@@ -322,7 +385,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        menu.addItem(menuItem("Show All History", #selector(AppDelegate.showHistory(_:)), "y"))
+        menu.addItem(appDelegate.shortcuts.menuItem(for: "showHistory"))
         return menu
     }
 
@@ -468,6 +531,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowDidResize(_ notification: Notification) { layoutTrafficLights() }
     func windowDidBecomeKey(_ notification: Notification) {
         layoutTrafficLights()
+        appDelegate.profiles.lastUsed = profileID
         #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             extensionController?.didFocusWindow(self)
@@ -508,6 +572,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     @objc func newTab(_ sender: Any?) {
         openTab(url: appDelegate.config.baseURL)
+    }
+
+    /// New windows use this window's profile.
+    @objc func newWindow(_ sender: Any?) {
+        appDelegate.openWindow(profile: profileID)
     }
 
     @objc func closeCurrentTab(_ sender: Any?) {

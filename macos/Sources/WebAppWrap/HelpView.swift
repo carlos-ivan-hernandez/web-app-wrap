@@ -58,6 +58,9 @@ struct HelpView: View {
                 "Only the app’s own site opens inside it, plus any sites you add in ⋮ → Allowed Sites. Links to other sites open in your browser, and Open Link won’t open them. Turn on ⋮ → Allow All Sites to open every link in the app for a while; the sites you visit are listed in Allowed Sites so you can save them.",
                 "Extensions sit in a menu behind the grid button next to it, rather than as a row of buttons.",
                 "⌥⌘I opens Web Inspector for debugging.",
+                "⋮ → Notifications shows the site’s notifications in macOS Notification Center; clicking one brings its tab forward.",
+                "⋮ → Profile keeps separate logins in separate windows, so you can use two accounts on the same site (macOS 14 or later).",
+                "⋮ → Keyboard Shortcuts… changes the shortcut of any menu command.",
             ])
         }
     }

@@ -19,7 +19,8 @@ more, tabs up to 240pt wide sit side by side, separated by thin dividers, and
 shrink to fit when there are many. Every tab uses the bar's color. The
 selected tab is marked by brighter text and its close button. If any extensions
 are on for the app, an **Extensions** button (a grid of four squares) sits next
-to ⋮.
+to ⋮. Once the app has more than one profile, the window's profile name is shown
+there too; click it to switch profiles.
 
 The **⋮** menu has:
 
@@ -43,12 +44,34 @@ The **⋮** menu has:
   **Visited while allowing all sites** in the Allowed Sites window, where you can
   **Save** it to the list or dismiss it. The switch stays on until you turn it
   off, even across restarts.
+- **Notifications**: a switch for showing the site's notifications in macOS
+  Notification Center. The first time a site asks (or you turn the switch on),
+  macOS asks whether to allow the app's notifications. Clicking a notification
+  brings its tab forward and lets the site open what it was about. Some sites
+  also need notifications turned on in their own settings, for example Gmail's
+  **Settings → Desktop notifications**. If notifications are turned off for the
+  app in **System Settings → Notifications**, the switch offers to open it.
+- **Profile**: each profile has its own logins, cookies and site data, so you
+  can be signed in to two accounts on the same site (for example two Instagram
+  accounts) in different windows. Choose a profile to bring its window forward
+  (or open one), **New Profile…** to make one, and **Manage Profiles…** to
+  rename or delete them. New windows (⌘N) and tabs use the profile of the window
+  you're in, and the app opens in the profile you used last. The first profile
+  keeps the logins the app had before profiles existed. History and Allowed
+  Sites are shared by all profiles. Extra profiles need macOS 14 or later.
+- **Keyboard Shortcuts…**: change the shortcut of any menu command (also in the
+  app menu). Click **Change** and press the new keys, or use the **…** menu to
+  add another shortcut, remove them, or restore the default. Giving a command a
+  shortcut another command uses moves it. Edit menu shortcuts (⌘C, ⌘V and so on)
+  can't be changed. Each app keeps its own shortcuts.
 - **Copy Page Link** and **Open Page in Browser**.
 
 History only lists pages on the app's own and allowed sites, so pages you
 pass through while signing in elsewhere aren't kept. Each app keeps its own
 history, up to 5,000 visits, in
 `~/Library/Application Support/<bundle ID>/history.json`.
+
+These are the default shortcuts. Change them in **⋮ → Keyboard Shortcuts…**.
 
 | Action | Result |
 | --- | --- |
@@ -87,7 +110,10 @@ working. Sign-in popups opened by a script (for example "Sign in with Google")
 also open in a tab inside the app, so they can report back to the page that
 opened them.
 
-Downloads go to `~/Downloads`. File uploads, JavaScript alerts, and camera and
+Downloads go to `~/Downloads`. If macOS won't let the app save there (for
+example because its access to Downloads is turned off in **System Settings →
+Privacy & Security → Files and Folders**), the app asks where to save the file
+instead. File uploads, JavaScript alerts, and camera and
 microphone access work. If a page fails to load, the app shows an error page
 with a **Try Again** button.
 
