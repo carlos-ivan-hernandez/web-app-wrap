@@ -6,8 +6,9 @@ enum IconSource {
     /// otherwise the name's first letter.
     case generated(name: String, symbol: String? = nil)
     /// An SVG on a solid `background`. At `zoom` 1 the whole SVG fits in the icon shape;
-    /// below 1 it shrinks, above 1 it grows and is cropped, staying centered.
-    case svg(NSImage, zoom: CGFloat = 1, background: HexColor = .defaultIconBackground)
+    /// below 1 it shrinks, above 1 it grows and is cropped, staying centered. With `color`,
+    /// every visible part of the SVG is filled with that one color; nil keeps its own colors.
+    case svg(NSImage, zoom: CGFloat = 1, background: HexColor = .defaultIconBackground, color: HexColor? = nil)
     /// Any other image (icons saved before SVG support), cropped to fill the rounded-square
     /// icon shape. `zoom` > 1 crops in further, keeping the image centered.
     case image(NSImage, zoom: CGFloat = 1)
@@ -24,15 +25,15 @@ enum IconSource {
     }
 
     /// Reads an image file the way the window draws it: an SVG on `background` (default
-    /// #1C1C1C), anything else with the automatic border crop. `zoom` is the user's zoom.
-    /// Nil if macOS can't read the file.
-    static func load(_ url: URL, zoom: Double = 1, background: HexColor? = nil) -> IconSource? {
+    /// #1C1C1C), in `color` if given, and anything else with the automatic border crop. `zoom`
+    /// is the user's zoom. Nil if macOS can't read the file.
+    static func load(_ url: URL, zoom: Double = 1, background: HexColor? = nil, color: HexColor? = nil) -> IconSource? {
         guard let image = NSImage(contentsOf: url), image.isValid,
               image.size.width > 0, image.size.height > 0
         else { return nil }
         if isSVG(url) {
             let zoom = min(max(CGFloat(zoom), svgZoomRange.lowerBound), svgZoomRange.upperBound)
-            return .svg(image, zoom: zoom, background: background ?? .defaultIconBackground)
+            return .svg(image, zoom: zoom, background: background ?? .defaultIconBackground, color: color)
         }
         let zoom = min(max(CGFloat(zoom), userZoomRange.lowerBound), userZoomRange.upperBound)
         return .image(image, zoom: IconRenderer.automaticZoom(for: image) * zoom)
@@ -226,13 +227,26 @@ enum IconRenderer {
                 drawLetter(of: name)
             }
 
-        case let .svg(image, zoom, background):
+        case let .svg(image, zoom, background, color):
             let zoom = max(zoom, 0.01)
-            let grow = tileRect.width * (zoom - 1) / 2
+            let imageRect = tileRect.insetBy(dx: -tileRect.width * (zoom - 1) / 2, dy: -tileRect.height * (zoom - 1) / 2)
             drawTile(in: context, scale: scale) {
-                context.setFillColor(CGColor(srgbRed: background.red, green: background.green, blue: background.blue, alpha: 1))
+                context.setFillColor(cgColor(background))
                 context.fill(tileRect)
-                drawImage(image, in: tileRect.insetBy(dx: -grow, dy: -grow), fill: false)
+                guard let color else {
+                    drawImage(image, in: imageRect, fill: false)
+                    return
+                }
+                // Draw the SVG on its own layer, then paint the color over just its pixels,
+                // keeping its edges' transparency.
+                context.saveGState()
+                context.beginTransparencyLayer(auxiliaryInfo: nil)
+                drawImage(image, in: imageRect, fill: false)
+                context.setBlendMode(.sourceIn)
+                context.setFillColor(cgColor(color))
+                context.fill(imageRect.union(tileRect))
+                context.endTransparencyLayer()
+                context.restoreGState()
             }
 
         case let .image(image, zoom):
@@ -242,6 +256,10 @@ enum IconRenderer {
                 drawImage(image, in: tileRect.insetBy(dx: -grow, dy: -grow), fill: true)
             }
         }
+    }
+
+    private static func cgColor(_ hex: HexColor) -> CGColor {
+        CGColor(srgbRed: hex.red, green: hex.green, blue: hex.blue, alpha: 1)
     }
 
     /// White rounded square with Apple's soft drop shadow; `content` draws clipped inside it.

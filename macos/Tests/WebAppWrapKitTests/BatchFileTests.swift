@@ -20,7 +20,7 @@ final class BatchFileTests: XCTestCase {
     func testFullEntry() throws {
         let entries = try parse(##"""
         [{"name": "Web App Wrap/Photos", "url": "kphotos.vercel.app", "image": "icons/photos.svg",
-          "zoom": 0.5, "iconBackground": "#fff", "titleBarColor": "#1a1a1a"}]
+          "zoom": 0.5, "iconBackground": "#fff", "iconColor": "#e5e5e5", "titleBarColor": "#1a1a1a"}]
         """##)
         XCTAssertEqual(entries.count, 1)
         let entry = entries[0]
@@ -29,6 +29,7 @@ final class BatchFileTests: XCTestCase {
         XCTAssertEqual(entry.image?.path, "/Users/me/apps/icons/photos.svg")
         XCTAssertEqual(entry.zoom, 0.5)
         XCTAssertEqual(entry.iconBackground?.hexString, "#FFFFFF")
+        XCTAssertEqual(entry.iconColor?.hexString, "#E5E5E5")
         XCTAssertEqual(entry.titleBarColor?.hexString, "#1A1A1A")
     }
 
@@ -37,6 +38,7 @@ final class BatchFileTests: XCTestCase {
         XCTAssertNil(entry.image)
         XCTAssertEqual(entry.zoom, 1)
         XCTAssertNil(entry.iconBackground)
+        XCTAssertNil(entry.iconColor)
         XCTAssertNil(entry.titleBarColor)
     }
 

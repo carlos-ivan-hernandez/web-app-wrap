@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebAppWrapKit
 
-/// The inputs for one app while they're being edited: the one-off form, or an app in the list.
+/// The inputs for one app while it's being added to or edited in the list.
 @MainActor
 final class AppDraft: ObservableObject {
     @Published var displayName = ""
@@ -36,6 +36,9 @@ final class AppDraft: ObservableObject {
     @Published private(set) var imageError: String?
     /// The fill behind an SVG icon.
     @Published var iconBackground = Color(nsColor: AppDraft.nsColor(.defaultIconBackground))
+    /// False draws the SVG in its own colors; true fills it with `svgColor`.
+    @Published var usesSVGColor = false
+    @Published var svgColor = Color(nsColor: AppDraft.nsColor(.defaultSVGColor))
 
     init() {}
 
@@ -50,6 +53,10 @@ final class AppDraft: ObservableObject {
         imageZoom = settings.zoom
         if let hex = settings.iconBackground.flatMap(HexColor.init(hex:)) {
             iconBackground = Color(nsColor: Self.nsColor(hex))
+        }
+        if let hex = settings.iconColor.flatMap(HexColor.init(hex:)) {
+            usesSVGColor = true
+            svgColor = Color(nsColor: Self.nsColor(hex))
         }
         if let hex = settings.titleBarColor.flatMap(HexColor.init(hex:)) {
             titleBarColor = Color(nsColor: Self.nsColor(hex))
@@ -68,7 +75,7 @@ final class AppDraft: ObservableObject {
 
     var iconSource: IconSource {
         if let customImage {
-            if imageIsSVG { return .svg(customImage, zoom: CGFloat(imageZoom), background: iconBackgroundHex) }
+            if imageIsSVG { return .svg(customImage, zoom: CGFloat(imageZoom), background: iconBackgroundHex, color: svgColorHex) }
             return .image(customImage, zoom: baseZoom * CGFloat(imageZoom))
         }
         return trimmedName.isEmpty ? .generated(name: "", symbol: "globe") : .generated(name: trimmedName)
@@ -91,6 +98,9 @@ final class AppDraft: ObservableObject {
 
     /// The picked icon background as sRGB hex.
     var iconBackgroundHex: HexColor { Self.hex(iconBackground) ?? .defaultIconBackground }
+
+    /// The color the SVG is filled with as sRGB hex, or nil to keep its own colors.
+    var svgColorHex: HexColor? { usesSVGColor ? Self.hex(svgColor) ?? .defaultSVGColor : nil }
 
     func chooseImage() {
         let panel = NSOpenPanel()

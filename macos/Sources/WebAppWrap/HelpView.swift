@@ -67,16 +67,15 @@ struct HelpView: View {
 
     private var twoWays: some View {
         section("Two ways to use it") {
-            paragraph("**The window** (this app). In **One-Off**, fill in the fields and click **Create App**:")
+            paragraph("**The window** (this app). In **My Apps**, click **+** to add an app and fill in:")
             bullets([
                 "**App name**: shown in the Dock and menu bar. Add folders with “/”: “WebAppWrap/Photos” saves Photos.app in a WebAppWrap folder inside your apps folder.",
                 "**Web address**: where new tabs open.",
-                "**Icon** (optional): an SVG, drawn on a background color you choose (#1C1C1C unless you pick another) and rounded to the macOS icon shape. The slider zooms the SVG out or in.",
+                "**Icon** (optional): an SVG, drawn on a background color you choose (#1C1C1C unless you pick another) and rounded to the macOS icon shape. The SVG keeps its own colors, or choose **One Color** to fill it with a color you pick (#E5E5E5 to start). The slider zooms the SVG out or in.",
                 "**Title bar color**: filled in from the site’s theme color; pick another to override it.",
             ])
             paragraph("""
-            **My Apps** lists every app made in this window, including one-offs. Add apps with **+**, \
-            double-click one to change it, then click **Build Apps** to see what will be built and why, \
+            **My Apps** lists every app made in this window. Double-click one to change it, then click **Build Apps** to see what will be built and why, \
             and click **Build** there to start. An app is skipped when nothing about \
             it changed and it was built by this version of WebAppWrap (\(GeneratorVersion.display)), so \
             after updating WebAppWrap, Build Apps rebuilds them all.
@@ -111,7 +110,7 @@ struct HelpView: View {
 
             command(
                 "build",
-                usage: "webappwrap build --name <name> --url <address> [--image <file.svg>] [--zoom <0.5-3>] [--icon-background <#RRGGBB>] [--title-bar-color <#RRGGBB>] [--out <folder>]",
+                usage: "webappwrap build --name <name> --url <address> [--image <file.svg>] [--zoom <0.5-3>] [--icon-background <#RRGGBB>] [--icon-color <#RRGGBB>] [--title-bar-color <#RRGGBB>] [--out <folder>]",
                 summary: "Creates one app.",
                 options: [
                     .init("--name", "App name. May include folders, e.g. \"WebAppWrap/Photos\". Required."),
@@ -119,6 +118,7 @@ struct HelpView: View {
                     .init("--image", "Icon SVG. Without it, a colored tile with the name’s first letter is drawn. Other images such as PNG still work as before: cropped to fill the icon."),
                     .init("--zoom", "0.5–3. At 1 the whole SVG fits in the icon; lower zooms out, higher zooms in. Default 1. (For other images: 1–3, on top of the automatic border crop.)"),
                     .init("--icon-background", "Hex color behind the SVG. Default #1C1C1C."),
+                    .init("--icon-color", "Fill the whole SVG with this hex color, e.g. #E5E5E5. Without it the SVG keeps its own colors."),
                     .init("--no-auto-zoom", "For other images: use the image as it is, without cropping off its border."),
                     .init("--title-bar-color", "Hex color such as #1a1a1a. Default: the site’s theme color."),
                     .init("--out", "Folder the app (and any folders in its name) go in. Defaults to the folder chosen in Settings, or /Applications."),
@@ -136,7 +136,7 @@ struct HelpView: View {
 
             command(
                 "icon",
-                usage: "webappwrap icon --name <name> [--image <file.svg>] [--zoom <0.5-3>] [--icon-background <#RRGGBB>] [--symbol <sf-symbol>] --out <file.icns>",
+                usage: "webappwrap icon --name <name> [--image <file.svg>] [--zoom <0.5-3>] [--icon-background <#RRGGBB>] [--icon-color <#RRGGBB>] [--symbol <sf-symbol>] --out <file.icns>",
                 summary: "Writes just the .icns icon, using the same rules as build.",
                 options: [
                     .init("--symbol", "Draw an SF Symbol (e.g. globe) on the default tile instead of a letter."),
@@ -160,6 +160,7 @@ struct HelpView: View {
                 "image": "icons/photos.svg",
                 "zoom": 0.8,
                 "iconBackground": "#ffffff",
+                "iconColor": "#e5e5e5",
                 "titleBarColor": "#1a1a1a"
               },
               { "name": "Linear", "url": "linear.app" }
@@ -169,6 +170,7 @@ struct HelpView: View {
                 "**image**: relative to the JSON file unless it starts with / or ~.",
                 "**zoom**: 0.5–3. At 1 the whole SVG fits in the icon.",
                 "**iconBackground**: the color behind the SVG. Defaults to #1C1C1C.",
+                "**iconColor**: fills the whole SVG with one color. Without it the SVG keeps its own colors.",
                 "**titleBarColor**: defaults to the site’s theme color.",
             ])
         }

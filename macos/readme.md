@@ -134,57 +134,42 @@ Generated apps need nothing extra. Each one includes everything it needs.
 ## Build
 
 ```bash
-./scripts/build.sh            # creates dist/WebAppWrap.app, versioned with the current commit
-./scripts/build.sh --install  # also copies it into /Applications
+./scripts/build.sh            # creates dist/WebAppWrap.app, versioned with the current commit, and copies it into /Applications
 UNIVERSAL=1 ./scripts/build.sh  # Apple silicon + Intel (needs full Xcode)
 ```
 
 ## Use
 
-WebAppWrap has two modes, picked at the top of its window: **One-Off** makes a
-single app right now, and **My Apps** keeps a list of your apps and builds them.
-
-### One-Off
-
-1. Choose **One-Off** at the top of the window.
-2. Enter the app name and the web address. To save the app in a subfolder of
-   your apps folder, put the folder in the name: `WebAppWrap/Photos` creates
-   `/Applications/WebAppWrap/Photos.app`, and the app is named "Photos". You can leave out `https://`.
-   Addresses that start with `localhost` use `http://`.
-3. Optionally, drop an SVG on the icon area or click **Choose SVG…**. WebAppWrap
-   draws it on a solid background, rounds the corners to the macOS icon shape and
-   adds the standard margin and shadow. Pick the **Background** color under the
-   preview; it's #1C1C1C unless you choose another. At the slider's starting point
-   the whole SVG fits in the icon; drag left to shrink it and leave more
-   background around it, or right to zoom in and crop. Without an SVG, WebAppWrap
-   draws a colored tile with the app name's first letter. (Apps in My Apps that
-   already have a PNG or other image icon keep it, drawn as before, until you
-   choose an SVG for them.)
-4. Check the **Title bar color**. It's the background of the bar holding the
-   window buttons and tabs. After you enter the web address, WebAppWrap fills it in
-   with the site's theme color, from its `<meta name="theme-color">` tag or its
-   web app manifest. You can pick a different color, and **Use Site Color**
-   switches back. If the site has no theme color, WebAppWrap uses `#1C1C1C`. The text
-   switches between light and dark to stay readable.
-5. Click **Create App**. WebAppWrap saves the app in your apps folder
-   (`/Applications` unless you change it; see below). If an app with that name
-   is already there, WebAppWrap asks before replacing it and moves the old copy
-   to the Trash.
-
-The app is also added to **My Apps**, or updates the entry there with the same
-name.
-
-You can recreate an app under the same name, for example to change its icon or
-URL. It keeps its sign-ins, because the app's data is tied to its bundle ID
-(`com.waw.app.<name>`).
+WebAppWrap's window has two tabs: **My Apps** keeps a list of your apps and
+builds them, and **Extensions** manages the browser extensions they share.
 
 ### My Apps
 
 **My Apps** lists every app made in the window, with its icon, address and
-whether it's up to date. The window opens in this mode once the list has any
-apps in it.
+whether it's up to date.
 
-- **+** adds an app, using the same fields as One-Off. Adding doesn't build it.
+- **+** adds an app. Adding doesn't build it. Fill in:
+  1. The app name and the web address. To save the app in a subfolder of
+     your apps folder, put the folder in the name: `WebAppWrap/Photos` creates
+     `/Applications/WebAppWrap/Photos.app`, and the app is named "Photos". You can leave out `https://`.
+     Addresses that start with `localhost` use `http://`.
+  2. Optionally, an icon: drop an SVG on the icon area or click **Choose SVG…**.
+     WebAppWrap draws it on a solid background, rounds the corners to the macOS
+     icon shape and adds the standard margin and shadow. Pick the **Background**
+     color under the preview; it's #1C1C1C unless you choose another. The **SVG**
+     menu keeps the SVG's **Original Colors**, or switches to **One Color**, which
+     fills the whole SVG with a color you pick (#E5E5E5 to start). At the
+     slider's starting point the whole SVG fits in the icon; drag left to shrink
+     it and leave more background around it, or right to zoom in and crop.
+     Without an SVG, WebAppWrap draws a colored tile with the app name's first
+     letter. (Apps that already have a PNG or other image icon keep it, drawn as
+     before, until you choose an SVG for them.)
+  3. The **Title bar color**. It's the background of the bar holding the
+     window buttons and tabs. After you enter the web address, WebAppWrap fills it in
+     with the site's theme color, from its `<meta name="theme-color">` tag or its
+     web app manifest. You can pick a different color, and **Use Site Color**
+     switches back. If the site has no theme color, WebAppWrap uses `#1C1C1C`. The text
+     switches between light and dark to stay readable.
 - Double-click an app, or select it and click **Edit…**, to change it.
 - **−** (or Delete) takes an app off the list. The app itself stays installed.
 - Right-click an app to build just that one, open it, or show it in Finder.
@@ -192,11 +177,15 @@ apps in it.
   (for example, its settings changed), and whether it creates a new app or
   replaces one in the apps folder. Nothing is built until you click **Build**
   there; **Back** returns to the list. Each app's progress and result show on
-  the same page, and **Done** returns to the list.
+  the same page, and **Done** returns to the list. A replaced app's old copy
+  goes to the Trash.
+
+Rebuilding an app, for example to change its icon or URL, keeps its sign-ins,
+because the app's data is tied to its bundle ID (`com.waw.app.<name>`).
 
 An app is **skipped** when both of these are true:
 
-- Nothing about it (name, address, icon, zoom, icon background or title bar color) has changed
+- Nothing about it (name, address, icon, zoom, icon background, SVG color or title bar color) has changed
   since it was last built.
 - It was last built by this version of WebAppWrap.
 
@@ -215,8 +204,7 @@ every app every time.
 
 Apps are saved in `/Applications` unless you pick another folder, for example
 `~/Applications/Web Apps`. Change it in **WebAppWrap → Settings** (⌘,), with
-**Change…** under the My Apps list, or with **Change Folder…** next to "Saves
-to" in One-Off. Folders in an app's name go inside it.
+**Change…** under the My Apps list. Folders in an app's name go inside it.
 
 When you change it, WebAppWrap offers to move the apps in My Apps that are
 already built. Moving keeps their sign-ins and settings, and removes any
@@ -328,6 +316,7 @@ inputs as the window:
     "image": "icons/photos.svg",
     "zoom": 0.8,
     "iconBackground": "#ffffff",
+    "iconColor": "#e5e5e5",
     "titleBarColor": "#1a1a1a"
   },
   { "name": "Linear", "url": "linear.app" }
@@ -341,6 +330,7 @@ inputs as the window:
 | `image` | no | Icon SVG path, relative to the JSON file unless absolute (`~` works). Without it, WebAppWrap draws the default icon. Other images such as PNG still work as before: cropped to fill the icon, with no background |
 | `zoom` | no | 0.5–3. At 1 the whole SVG fits in the icon; lower zooms out, higher zooms in. Defaults to 1. For other images, 1–3 on top of the automatic zoom that crops off a border |
 | `iconBackground` | no | The color behind the SVG, for example `"#ffffff"`. Defaults to `#1C1C1C` |
+| `iconColor` | no | Fills the whole SVG with one color, for example `"#e5e5e5"`. Without it, the SVG keeps its own colors |
 | `titleBarColor` | no | For example `"#1a1a1a"`. Defaults to the site's theme color |
 
 The file can also be JSONC or JSON5 (`.jsonc`, `.json5`), so comments, trailing
@@ -364,7 +354,7 @@ the end without stopping the rest.
 ```bash
 wrap="/Applications/WebAppWrap.app/Contents/MacOS/WebAppWrap"
 "$wrap" build --name "WebAppWrap/Linear" --url linear.app
-"$wrap" build --name "Grafana" --url localhost:3000 --image ~/grafana.svg --zoom 0.8 --icon-background "#ffffff" --title-bar-color "#1a1a1a" --out ~/Applications # --out defaults to the apps folder
+"$wrap" build --name "Grafana" --url localhost:3000 --image ~/grafana.svg --zoom 0.8 --icon-background "#ffffff" --icon-color "#e5e5e5" --title-bar-color "#1a1a1a" --out ~/Applications # --out defaults to the apps folder
 "$wrap" batch ~/apps.json                      # every app in a JSON file
 "$wrap" icon --name "Linear" --out Linear.icns # just the icon
 ```

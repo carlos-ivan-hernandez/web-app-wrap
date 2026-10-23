@@ -18,7 +18,7 @@ enum BatchBuilder {
     static func spec(for entry: BatchEntry, appID: UUID? = nil) async throws -> AppSpec {
         var icon = IconSource.generated(name: entry.location.name)
         if let imageURL = entry.image {
-            guard let loaded = IconSource.load(imageURL, zoom: entry.zoom, background: entry.iconBackground) else {
+            guard let loaded = IconSource.load(imageURL, zoom: entry.zoom, background: entry.iconBackground, color: entry.iconColor) else {
                 throw UnreadableImage(path: imageURL.path)
             }
             icon = loaded

@@ -13,15 +13,18 @@ public struct AppSettings: Codable, Equatable {
     public var zoom: Double
     /// "#RRGGBB" behind an SVG icon. nil uses HexColor.defaultIconBackground.
     public var iconBackground: String?
+    /// "#RRGGBB" an SVG icon is filled with. nil keeps the SVG's own colors.
+    public var iconColor: String?
     /// "#RRGGBB". nil uses the site's theme color.
     public var titleBarColor: String?
 
-    public init(name: String, url: String, icon: String? = nil, zoom: Double = 1, iconBackground: String? = nil, titleBarColor: String? = nil) {
+    public init(name: String, url: String, icon: String? = nil, zoom: Double = 1, iconBackground: String? = nil, iconColor: String? = nil, titleBarColor: String? = nil) {
         self.name = name
         self.url = url
         self.icon = icon
         self.zoom = zoom
         self.iconBackground = iconBackground
+        self.iconColor = iconColor
         self.titleBarColor = titleBarColor
     }
 
@@ -94,6 +97,7 @@ public struct AppRecord: Codable, Equatable, Identifiable {
             image: settings.icon.map { iconsFolder.appendingPathComponent($0) },
             zoom: settings.zoom,
             iconBackground: settings.iconBackground.flatMap(HexColor.init(hex:)),
+            iconColor: settings.iconColor.flatMap(HexColor.init(hex:)),
             titleBarColor: settings.titleBarColor.flatMap(HexColor.init(hex:))
         )
     }

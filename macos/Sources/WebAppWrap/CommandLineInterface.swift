@@ -9,10 +9,13 @@ enum CommandLineInterface {
           Open the app.
 
       WebAppWrap build --name <name> --url <address> [--image <file.svg>] [--zoom <0.5-3>]
-                    [--icon-background <#RRGGBB>] [--title-bar-color <#RRGGBB>] [--out <folder>]
+                    [--icon-background <#RRGGBB>] [--icon-color <#RRGGBB>]
+                    [--title-bar-color <#RRGGBB>] [--out <folder>]
           Create one app. <name> may include folders, e.g. "WebAppWrap/Photos".
-          The SVG is drawn on --icon-background (default #1C1C1C). At --zoom 1 the
-          whole SVG fits in the icon; lower zooms out, higher zooms in.
+          The SVG is drawn on --icon-background (default #1C1C1C). --icon-color fills
+          the whole SVG with one color (e.g. #E5E5E5); without it the SVG keeps its
+          own colors. At --zoom 1 the whole SVG fits in the icon; lower zooms out,
+          higher zooms in.
           Other images (PNG and so on) still work as before: cropped to fill the
           icon, with --zoom 1-3 on top of an automatic zoom that crops off their
           border, unless --no-auto-zoom.
@@ -22,13 +25,13 @@ enum CommandLineInterface {
 
       WebAppWrap batch <file.json> [--out <folder>]
           Create every app listed in a JSON array of objects with the fields
-          name, url, image, zoom, iconBackground and titleBarColor (only name and url
-          are required).
+          name, url, image, zoom, iconBackground, iconColor and titleBarColor (only
+          name and url are required).
           JSONC and JSON5 (comments, trailing commas, unquoted keys) work too.
           Apps built from the command line aren't added to the window's My Apps list.
 
       WebAppWrap icon --name <name> [--symbol <sf-symbol>] [--image <file.svg>] [--zoom <0.5-3>]
-                   [--icon-background <#RRGGBB>] --out <file.icns>
+                   [--icon-background <#RRGGBB>] [--icon-color <#RRGGBB>] --out <file.icns>
           Write just the icon.
     """
 
@@ -71,8 +74,13 @@ enum CommandLineInterface {
             guard let parsed = HexColor(hex: raw) else { throw UsageError(message: "--icon-background must look like #1C1C1C.") }
             background = parsed
         }
+        var color: HexColor?
+        if let raw = value("--icon-color", in: options) {
+            guard let parsed = HexColor(hex: raw) else { throw UsageError(message: "--icon-color must look like #E5E5E5.") }
+            color = parsed
+        }
         let zoom = value("--zoom", in: options).flatMap(Double.init) ?? 1
-        guard let icon = IconSource.load(url, zoom: zoom, background: background) else {
+        guard let icon = IconSource.load(url, zoom: zoom, background: background, color: color) else {
             throw UsageError(message: "Couldn’t read an image from \(imagePath).")
         }
         // --no-auto-zoom: use a non-SVG image as it is, border and all.

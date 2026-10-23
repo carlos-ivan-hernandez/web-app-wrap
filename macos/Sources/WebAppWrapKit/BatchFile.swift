@@ -9,6 +9,7 @@ import Foundation
 ///         "image": "icons/photos.svg",
 ///         "zoom": 0.8,
 ///         "iconBackground": "#ffffff",
+///         "iconColor": "#e5e5e5",
 ///         "titleBarColor": "#1a1a1a"
 ///       }
 ///     ]
@@ -16,6 +17,7 @@ import Foundation
 /// Only `name` and `url` are required. `name` may include folders, as in the window.
 /// `image` is a path, relative to the batch file unless absolute (`~` works). An SVG is drawn on
 /// `iconBackground` (default #1C1C1C), and `zoom` (0.5–3) scales it, where 1 fits the whole SVG.
+/// `iconColor` fills the whole SVG with one color; without it the SVG keeps its own colors.
 /// Other images are cropped to fill the icon as before SVG support, and `zoom` (1–3) is on top
 /// of the automatic zoom that crops off a border.
 /// `titleBarColor` defaults to the site's theme color.
@@ -26,14 +28,16 @@ public struct BatchEntry: Equatable {
     public let image: URL?
     public let zoom: Double
     public let iconBackground: HexColor?
+    public let iconColor: HexColor?
     public let titleBarColor: HexColor?
 
-    public init(location: AppLocation, url: URL, image: URL?, zoom: Double, iconBackground: HexColor? = nil, titleBarColor: HexColor?) {
+    public init(location: AppLocation, url: URL, image: URL?, zoom: Double, iconBackground: HexColor? = nil, iconColor: HexColor? = nil, titleBarColor: HexColor?) {
         self.location = location
         self.url = url
         self.image = image
         self.zoom = zoom
         self.iconBackground = iconBackground
+        self.iconColor = iconColor
         self.titleBarColor = titleBarColor
     }
 }
@@ -66,7 +70,7 @@ public enum BatchFile {
 
         var entries: [BatchEntry] = []
         var problems: [String] = []
-        let knownKeys: Set<String> = ["name", "url", "image", "zoom", "iconBackground", "titleBarColor"]
+        let knownKeys: Set<String> = ["name", "url", "image", "zoom", "iconBackground", "iconColor", "titleBarColor"]
 
         for (index, element) in objects.enumerated() {
             let label = "Entry \(index + 1)"
@@ -115,6 +119,12 @@ public enum BatchFile {
                 if iconBackground == nil { entryProblems.append("“iconBackground” must be a color like \"#1c1c1c\"") }
             }
 
+            var iconColor: HexColor?
+            if let value = object["iconColor"], !(value is NSNull) {
+                iconColor = (value as? String).flatMap(HexColor.init(css:))
+                if iconColor == nil { entryProblems.append("“iconColor” must be a color like \"#e5e5e5\"") }
+            }
+
             var titleBarColor: HexColor?
             if let value = object["titleBarColor"], !(value is NSNull) {
                 titleBarColor = (value as? String).flatMap(HexColor.init(css:))
@@ -122,7 +132,7 @@ public enum BatchFile {
             }
 
             if let url, entryProblems.isEmpty {
-                entries.append(BatchEntry(location: location, url: url, image: image, zoom: zoom, iconBackground: iconBackground, titleBarColor: titleBarColor))
+                entries.append(BatchEntry(location: location, url: url, image: image, zoom: zoom, iconBackground: iconBackground, iconColor: iconColor, titleBarColor: titleBarColor))
             } else {
                 problems.append("\(entryLabel): \(entryProblems.joined(separator: "; ")).")
             }

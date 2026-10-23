@@ -7,32 +7,27 @@ import WebAppWrapKit
 final class BuilderModel: ObservableObject {
     enum Status: Equatable {
         case idle
-        case building
-        case finished(URL)
-        case failed(String)
         /// Building app `current` (1-based) of `total` from the list.
         case buildingList(current: Int, total: Int, name: String)
         case listFinished(created: [URL], failed: Int, skipped: Int)
 
         var isBusy: Bool {
             switch self {
-            case .building, .buildingList: true
+            case .buildingList: true
             default: false
             }
         }
     }
 
     enum Mode: String {
-        case oneOff
         case list
         case extensions
     }
 
-    @Published var mode = Mode.oneOff
+    @Published var mode = Mode.list
     /// Where apps are saved. Change it with `chooseAppsFolder()`.
     @Published private(set) var appsFolder = AppsFolder.current
     @Published private(set) var status: Status = .idle
-    let oneOff: AppDraft
 
     let registry = AppRegistry.standard
     /// Every app WebAppWrap has created, plus any added to the list and not built yet.
@@ -47,66 +42,14 @@ final class BuilderModel: ObservableObject {
     @Published var extensionsLoadError: String?
 
     init() {
-        oneOff = AppDraft()
         do {
             records = try registry.load()
         } catch {
             loadError = "\(registry.listFile.path) couldn’t be read: \(error.localizedDescription)"
         }
-        if !records.isEmpty { mode = .list }
         // Extensions installed by an older WebAppWrap get the current compatibility script.
         extensionStore.updateCompatibility()
         reloadExtensions()
-    }
-
-    // MARK: - One-off
-
-    var canCreateOneOff: Bool { oneOff.isValid && !status.isBusy }
-
-    /// Builds the one-off form's app, then records it in the list.
-    func createApp() {
-        let draft = oneOff
-        guard canCreateOneOff, let url = draft.normalizedURL else { return }
-        let destination = draft.destination
-        let key = draft.location.key
-        let appID = records.first { $0.settings.location.key == key }?.id ?? UUID()
-
-        if FileManager.default.fileExists(atPath: destination.path) {
-            let alert = NSAlert()
-            alert.messageText = "Replace \(destination.lastPathComponent)?"
-            alert.informativeText = "An app already exists at \(destination.path). It will be moved to the Trash. Its sign-ins and settings are kept."
-            alert.addButton(withTitle: "Replace")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
-
-        let spec = AppSpec(displayName: draft.trimmedName, baseURL: url, icon: draft.iconSource, titleBarColor: draft.titleBarHex, appID: appID)
-        status = .building
-        Task {
-            let result = await Task.detached(priority: .userInitiated) {
-                Result { try AppBuilder.build(spec, to: destination) }
-            }.value
-            switch result {
-            case let .success(app):
-                status = .finished(app)
-                do {
-                    try recordOneOff(draft, id: appID)
-                } catch {
-                    status = .failed("Created \(app.lastPathComponent), but it couldn’t be added to your apps: \(error.localizedDescription)")
-                }
-            case let .failure(error):
-                status = .failed(error.localizedDescription)
-            }
-        }
-    }
-
-    /// Adds the app to the list, or updates the entry with the same name, marked as just built.
-    private func recordOneOff(_ draft: AppDraft, id: UUID) throws {
-        let existing = findRecord(id)
-        var record = existing ?? AppRecord(id: id, settings: AppSettings(name: "", url: ""))
-        record.settings = try settings(from: draft, id: record.id, replacing: existing?.settings)
-        record.lastBuild = BuildStamp(version: GeneratorVersion.commit, date: Date(), settings: record.settings)
-        try store(record)
     }
 
     // MARK: - The list
@@ -187,6 +130,7 @@ final class BuilderModel: ObservableObject {
             icon: icon,
             zoom: icon == nil ? 1 : draft.imageZoom,
             iconBackground: icon != nil && draft.imageIsSVG ? draft.iconBackgroundHex.hexString : nil,
+            iconColor: icon != nil && draft.imageIsSVG ? draft.svgColorHex?.hexString : nil,
             titleBarColor: draft.chosenTitleBarColor?.hexString
         )
     }

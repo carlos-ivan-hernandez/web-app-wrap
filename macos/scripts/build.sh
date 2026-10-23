@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds "dist/WebAppWrap.app". Pass --install to also copy it into /Applications.
+# Builds "dist/WebAppWrap.app" and copies it into /Applications.
 # UNIVERSAL=1 builds for both Apple silicon and Intel (requires full Xcode, not just the command line tools).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -18,6 +18,16 @@ if [[ -z "$commit" ]]; then
 elif [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
   commit="$commit-dirty"
 fi
+
+# SwiftPM's build cache records absolute paths. If the project folder has moved since the last
+# build, the cache points at the old folder and every build warns about "stale files", so start
+# fresh. A cache without a recorded path is from before this check, so it's cleared too.
+if [[ -d .build && "$(cat .build/source-path 2>/dev/null)" != "$PWD" ]]; then
+  echo "The build cache is from another folder; clearing it."
+  rm -rf .build
+fi
+mkdir -p .build
+echo "$PWD" > .build/source-path
 
 swift build -c release ${arch_flags[@]+"${arch_flags[@]}"}
 bin_dir="$(swift build -c release ${arch_flags[@]+"${arch_flags[@]}"} --show-bin-path)"
@@ -43,13 +53,11 @@ codesign --force --sign - "$app/Contents/Resources/WebAppWrapRuntime"
 codesign --force --sign - "$app"
 echo "Built $app (version ${commit:-none})"
 
-if [[ "${1:-}" == "--install" ]]; then
-  rm -rf "/Applications/WebAppWrap.app"
-  cp -R "$app" /Applications/
-  echo "Installed /Applications/WebAppWrap.app"
-  for old in "/Applications/Web App Wrap.app" /Applications/WebWrap.app; do
-    if [[ -d "$old" ]]; then
-      echo "Note: the old $old is still installed; you can delete it."
-    fi
-  done
-fi
+rm -rf "/Applications/WebAppWrap.app"
+cp -R "$app" /Applications/
+echo "Installed /Applications/WebAppWrap.app"
+for old in "/Applications/Web App Wrap.app" /Applications/WebWrap.app; do
+  if [[ -d "$old" ]]; then
+    echo "Note: the old $old is still installed; you can delete it."
+  fi
+done

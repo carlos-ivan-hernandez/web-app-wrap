@@ -12,6 +12,9 @@ public struct HexColor: Equatable {
     /// The color behind an SVG icon when none is chosen.
     public static let defaultIconBackground = HexColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1C / 255)
 
+    /// The color offered when the user switches an SVG from its own colors to a single color.
+    public static let defaultSVGColor = HexColor(red: 0xE5 / 255, green: 0xE5 / 255, blue: 0xE5 / 255)
+
     public init(red: Double, green: Double, blue: Double) {
         self.red = min(max(red, 0), 1)
         self.green = min(max(green, 0), 1)

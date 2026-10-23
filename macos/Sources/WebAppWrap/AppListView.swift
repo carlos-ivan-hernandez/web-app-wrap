@@ -67,7 +67,7 @@ struct AppListView: View {
             .frame(height: 340)
             .overlay {
                 if model.records.isEmpty && model.loadError == nil {
-                    Text("No apps yet. Click + to add one, or create a one-off app.")
+                    Text("No apps yet. Click + to add one.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -190,7 +190,8 @@ private struct AppRow: View {
     private var iconSource: IconSource {
         if let iconURL, let icon = IconSource.load(
             iconURL, zoom: record.settings.zoom,
-            background: record.settings.iconBackground.flatMap(HexColor.init(hex:))
+            background: record.settings.iconBackground.flatMap(HexColor.init(hex:)),
+            color: record.settings.iconColor.flatMap(HexColor.init(hex:))
         ) {
             return icon
         }

@@ -1,13 +1,10 @@
 import SwiftUI
 import WebAppWrapKit
 
-/// The icon, name, address and title bar color fields, used by the one-off form and the
-/// sheet that adds or edits an app in the list.
+/// The icon, name, address and title bar color fields of the sheet that adds or edits an app.
 struct AppForm: View {
     @ObservedObject var draft: AppDraft
     var onSubmit: () -> Void = {}
-    /// Shows a Change Folder… link after "Saves to …" when set.
-    var onChangeFolder: (() -> Void)? = nil
     /// Read so the "Saves to" path updates when the apps folder changes.
     @AppStorage(AppsFolder.defaultsKey) private var appsFolderPath = ""
 
@@ -60,6 +57,25 @@ struct AppForm: View {
                 .font(.caption)
                 .controlSize(.small)
                 .help("The color behind the SVG")
+
+                HStack(spacing: 6) {
+                    Picker("SVG", selection: $draft.usesSVGColor) {
+                        Text("Original Colors").tag(false)
+                        Text("One Color").tag(true)
+                    }
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    if draft.usesSVGColor {
+                        ColorPicker("SVG color", selection: $draft.svgColor, supportsOpacity: false)
+                            .labelsHidden()
+                        Text(draft.svgColorHex?.hexString ?? "")
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
+                .font(.caption)
+                .controlSize(.small)
+                .help("Keep the SVG’s own colors, or fill it with one color")
             }
 
             Group {
@@ -88,17 +104,10 @@ struct AppForm: View {
                 if draft.trimmedName.isEmpty {
                     caption("Shown in the Dock, menu bar and Finder. Add folders with “/”.")
                 } else {
-                    HStack(spacing: 6) {
-                        caption("Saves to \(AppsFolder.displayPath(draft.destination))")
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .help(draft.destination.path)
-                        if let onChangeFolder {
-                            Button("Change Folder…", action: onChangeFolder)
-                                .buttonStyle(.link)
-                                .font(.caption)
-                        }
-                    }
+                    caption("Saves to \(AppsFolder.displayPath(draft.destination))")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(draft.destination.path)
                 }
             }
 

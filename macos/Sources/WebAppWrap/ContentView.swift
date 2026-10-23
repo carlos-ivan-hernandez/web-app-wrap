@@ -1,14 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// The main window: make one app now (One-Off), or keep a list of apps and build them (My Apps).
+/// The main window: the list of apps to build (My Apps), and the browser extensions they share.
 struct ContentView: View {
     @ObservedObject var model: BuilderModel
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("Mode", selection: $model.mode) {
-                Text("One-Off").tag(BuilderModel.Mode.oneOff)
                 Text("My Apps").tag(BuilderModel.Mode.list)
                 Text("Extensions").tag(BuilderModel.Mode.extensions)
             }
@@ -18,7 +17,6 @@ struct ContentView: View {
             .padding(.top, 18)
 
             switch model.mode {
-            case .oneOff: OneOffView(model: model, draft: model.oneOff)
             case .list: AppListView(model: model)
             case .extensions: ExtensionsView(model: model)
             }
@@ -28,30 +26,6 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.reloadExtensions()
         }
-    }
-}
-
-/// Fill in the form and create one app. It's added to My Apps too.
-struct OneOffView: View {
-    @ObservedObject var model: BuilderModel
-    @ObservedObject var draft: AppDraft
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            AppForm(draft: draft, onSubmit: { model.createApp() }, onChangeFolder: { model.chooseAppsFolder() })
-                .disabled(model.status.isBusy)
-            Divider()
-            HStack(spacing: 10) {
-                HelpButton()
-                StatusView(model: model)
-                Spacer()
-                Button("Create App") { model.createApp() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!model.canCreateOneOff)
-            }
-            .frame(minHeight: 28)
-        }
-        .padding(24)
     }
 }
 
@@ -87,7 +61,7 @@ struct HelpButton: View {
     }
 }
 
-/// Progress and results of the last build, shared by both modes.
+/// Progress and results of the last build.
 struct StatusView: View {
     @ObservedObject var model: BuilderModel
 
@@ -95,17 +69,6 @@ struct StatusView: View {
         switch model.status {
         case .idle:
             EmptyView()
-        case .building:
-            ProgressView().controlSize(.small)
-            Text("Building…").foregroundStyle(.secondary)
-        case let .finished(app):
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-            Text("Created \(app.lastPathComponent)").lineLimit(1).truncationMode(.middle)
-            Button("Open") { model.open(app) }
-            Button("Show in Finder") { model.reveal(app) }
-        case let .failed(message):
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            Text(message).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled)
         case let .buildingList(current, total, name):
             ProgressView().controlSize(.small)
             Text("Building \(current) of \(total): \(name)…")
