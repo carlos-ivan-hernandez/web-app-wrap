@@ -142,6 +142,32 @@ final class ExtensionStoreTests: XCTestCase {
         XCTAssertTrue(fileManager.fileExists(atPath: store.resourceURL(for: third).path))
     }
 
+    func testInstallAddsCompatibilityScript() throws {
+        let (source, manifest) = try unpacked(name: "Vimium", version: "2")
+        let installed = try store.install(from: source, manifest: manifest, sourceName: nil)
+        let folder = store.resourceURL(for: installed)
+        XCTAssertEqual(ExtensionCompat.appliedVersion(in: folder), ExtensionCompat.version)
+        XCTAssertNil(ExtensionCompat.appliedVersion(in: source), "the original isn't changed")
+        XCTAssertEqual(store.updateCompatibility(), [], "nothing to update")
+    }
+
+    func testUpdateCompatibilityCopiesOldInstalls() throws {
+        // As an older WebAppWrap left it: copied, without the script.
+        let (source, _) = try unpacked(name: "Stylish", version: "3")
+        let old = InstalledExtension(id: "stylish", name: "Stylish", version: "3", folder: "stylish/3-old", apps: [UUID().uuidString.lowercased(): false])
+        try FileManager.default.createDirectory(at: store.extensionsFolder.appendingPathComponent("stylish"), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: source, to: store.resourceURL(for: old))
+        try store.save([old])
+
+        XCTAssertEqual(store.updateCompatibility(), ["stylish"])
+        let updated = try XCTUnwrap(store.load().first)
+        XCTAssertNotEqual(updated.folder, old.folder)
+        XCTAssertEqual(updated.apps, old.apps, "app settings are kept")
+        XCTAssertEqual(ExtensionCompat.appliedVersion(in: store.resourceURL(for: updated)), ExtensionCompat.version)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.resourceURL(for: old).path), "an app may still be using the old copy")
+        XCTAssertEqual(store.updateCompatibility(), [])
+    }
+
     func testUninstall() throws {
         let (source, manifest) = try unpacked(name: "Gone", version: "1")
         let installed = try store.install(from: source, manifest: manifest, sourceName: nil)
@@ -196,5 +222,72 @@ final class ExtensionStoreTests: XCTestCase {
         XCTAssertEqual(found[3].manifest.version, "2.10.0", "newest version wins")
         XCTAssertEqual(found[3].browser, "Google Chrome")
         XCTAssertEqual(found[3].browserID, vimium)
+    }
+}
+
+final class ExtensionCompatTests: XCTestCase {
+    private var folder: URL!
+
+    override func setUpWithError() throws {
+        folder = FileManager.default.temporaryDirectory.appendingPathComponent("ExtensionCompatTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("ui"), withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    private func write(_ text: String, to path: String) throws {
+        try Data(text.utf8).write(to: folder.appendingPathComponent(path))
+    }
+
+    private func read(_ path: String) throws -> String {
+        try String(contentsOf: folder.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private func background() throws -> [String: Any] {
+        let data = try Data(contentsOf: folder.appendingPathComponent("manifest.json"))
+        let manifest = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return try XCTUnwrap(manifest["background"] as? [String: Any])
+    }
+
+    func testServiceWorkerGetsWrapper() throws {
+        try write(#"{"manifest_version": 3, "name": "A", "version": "1", "background": {"service_worker": "./js/bg.js"}}"#, to: "manifest.json")
+        try ExtensionCompat.apply(to: folder)
+        XCTAssertEqual(try background()["service_worker"] as? String, "__webappwrap_background.js")
+        XCTAssertEqual(try read("__webappwrap_background.js"), #"importScripts("/__webappwrap_compat.js", "/js/bg.js");"# + "\n")
+        XCTAssertTrue(try read("__webappwrap_compat.js").contains("onHistoryStateUpdated"))
+
+        try ExtensionCompat.apply(to: folder)
+        XCTAssertEqual(try read("__webappwrap_background.js"), #"importScripts("/__webappwrap_compat.js", "/js/bg.js");"# + "\n", "applying again changes nothing")
+    }
+
+    func testModuleServiceWorker() throws {
+        try write(#"{"manifest_version": 3, "name": "A", "version": "1", "background": {"service_worker": "bg.js", "type": "module"}}"#, to: "manifest.json")
+        try ExtensionCompat.apply(to: folder)
+        XCTAssertEqual(try background()["type"] as? String, "module")
+        XCTAssertEqual(try read("__webappwrap_background.js"), "import \"./__webappwrap_compat.js\";\nimport \"./bg.js\";\n")
+    }
+
+    func testBackgroundScriptsGetItFirst() throws {
+        try write(#"{"manifest_version": 2, "name": "A", "version": "1", "background": {"scripts": ["a.js", "b.js"]}}"#, to: "manifest.json")
+        try ExtensionCompat.apply(to: folder)
+        try ExtensionCompat.apply(to: folder)
+        XCTAssertEqual(try background()["scripts"] as? [String], ["__webappwrap_compat.js", "a.js", "b.js"])
+    }
+
+    func testPages() throws {
+        try write(#"{"manifest_version": 3, "name": "A", "version": "1"}"#, to: "manifest.json")
+        try write("<!doctype html><html><HEAD lang=en><title>P</title></HEAD></html>", to: "ui/popup.html")
+        try ExtensionCompat.apply(to: folder)
+        try ExtensionCompat.apply(to: folder)
+        XCTAssertEqual(try read("ui/popup.html"), #"<!doctype html><html><HEAD lang=en><script src="/__webappwrap_compat.js"></script><title>P</title></HEAD></html>"#)
+        XCTAssertEqual(ExtensionCompat.withScript("<html><header>x</header></html>"), #"<html><script src="/__webappwrap_compat.js"></script><header>x</header></html>"#)
+        XCTAssertEqual(ExtensionCompat.withScript("<p>x</p>"), #"<script src="/__webappwrap_compat.js"></script><p>x</p>"#)
+    }
+
+    func testOptionalPermissions() throws {
+        let manifest = try ExtensionManifest.parse(Data(#"{"manifest_version": 3, "name": "B", "version": "1", "optional_permissions": ["nativeMessaging", "https://*/*"]}"#.utf8))
+        XCTAssertEqual(manifest.optionalPermissions, ["nativeMessaging"])
     }
 }

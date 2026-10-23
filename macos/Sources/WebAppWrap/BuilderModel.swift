@@ -54,6 +54,8 @@ final class BuilderModel: ObservableObject {
             loadError = "\(registry.listFile.path) couldn’t be read: \(error.localizedDescription)"
         }
         if !records.isEmpty { mode = .list }
+        // Extensions installed by an older WebAppWrap get the current compatibility script.
+        extensionStore.updateCompatibility()
         reloadExtensions()
     }
 

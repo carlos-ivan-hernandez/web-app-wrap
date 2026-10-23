@@ -16,7 +16,17 @@ import WebAppWrapKit
 @MainActor
 final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
     /// Shared by every tab's web view configuration. Its storage is this app's own.
-    let controller = WKWebExtensionController(configuration: .default())
+    let controller: WKWebExtensionController = {
+        let configuration = WKWebExtensionController.Configuration.default()
+        // Extension pages (background, popups, options) identify as Safari, like the tabs. With
+        // WebKit's plain user agent, Bitwarden can't tell which browser it's in and won't start.
+        let pages = configuration.webViewConfiguration ?? WKWebViewConfiguration()
+        pages.applicationNameForUserAgent = AppDelegate.userAgentApplicationName
+        configuration.webViewConfiguration = pages
+        return WKWebExtensionController(configuration: configuration)
+    }()
+    /// Runs extensions' keyboard shortcuts (the manifest's "commands").
+    private var keyMonitor: Any?
     private unowned let appDelegate: AppDelegate
     private let store = ExtensionStore.standard
 
@@ -41,6 +51,15 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
         self.appDelegate = appDelegate
         super.init()
         controller.delegate = self
+        // Before the menus see the key, so an extension's shortcut works in the browser
+        // windows. Other windows (such as Keyboard Shortcuts, while recording) are left alone.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.window?.windowController is BrowserWindowController else { return event }
+            for item in self.loaded where item.context.performCommand(for: event) {
+                return nil
+            }
+            return event
+        }
     }
 
     // MARK: - Loading
@@ -113,14 +132,19 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
             context.setPermissionStatus(.grantedExplicitly, for: permission)
         }
         var patterns = webExtension.requestedPermissionMatchPatterns
-        let manifestHosts = (try? ExtensionManifest.read(from: store.resourceURL(for: item)))?.hostPermissions ?? []
-        for host in manifestHosts {
+        let manifest = try? ExtensionManifest.read(from: store.resourceURL(for: item))
+        for host in manifest?.hostPermissions ?? [] {
             if let pattern = try? WKWebExtension.MatchPattern(string: host) {
                 patterns.insert(pattern)
             }
         }
         for pattern in patterns {
             context.setPermissionStatus(.grantedExplicitly, for: pattern)
+        }
+        // Lets an extension call its desktop app even if it would ask first (Bitwarden does).
+        // Only NativeAppStandIns answers, so this reaches nothing outside the app.
+        if manifest?.optionalPermissions.contains("nativeMessaging") == true {
+            context.setPermissionStatus(.grantedExplicitly, for: .nativeMessaging)
         }
     }
 
@@ -143,6 +167,16 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
             popover.behavior = .transient
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
         }
+    }
+
+    /// Clicks an extension's toolbar button in the front window, for extensions that open their
+    /// own popup.
+    func showPopup(for context: WKWebExtensionContext) {
+        guard let window = appDelegate.frontWindowController,
+              let anchor = window.toolbarButton(for: context.uniqueIdentifier)
+        else { return }
+        window.window?.makeKeyAndOrderFront(nil)
+        performAction(context, for: window.selectedTab, anchor: anchor)
     }
 
     /// Turns an extension on or off for this app from the Extensions menu, saving the choice
@@ -303,6 +337,18 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
         }
         rememberGrants(patterns: hosts.map { "*://\($0)/*" }, for: extensionContext)
         completionHandler(urls, nil)
+    }
+
+    // MARK: - Desktop apps (native messaging)
+
+    func webExtensionController(
+        _ controller: WKWebExtensionController,
+        sendMessage message: Any,
+        toApplicationWithIdentifier applicationIdentifier: String?,
+        for extensionContext: WKWebExtensionContext,
+        replyHandler: @escaping (Any?, (any Error)?) -> Void
+    ) {
+        NativeAppStandIns.reply(to: message, for: applicationIdentifier, from: extensionContext, host: self, replyHandler: replyHandler)
     }
 
     // MARK: - Toolbar buttons

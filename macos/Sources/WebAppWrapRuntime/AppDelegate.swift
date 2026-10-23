@@ -13,6 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static let windowAutosaveName = "WebAppWrapBrowserWindow"
+    /// Added to WebKit's user agent in tabs and extension pages, to identify as Safari. Some
+    /// sites refuse sign-in from "embedded" browsers, and extensions such as Bitwarden won't
+    /// start in a browser they don't recognize.
+    static let userAgentApplicationName = "Version/18.0 Safari/605.1.15"
     private static let pageZoomKey = "PageZoom"
 
     private(set) var config: WrapperConfig!
@@ -169,8 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configuration.websiteDataStore = profiles.dataStore(for: profile)
         // Shared by all tabs; it carries the script that forwards notifications.
         configuration.userContentController = notifications.userContentController
-        // Identify as Safari; some sites refuse sign-in from "embedded" browsers.
-        configuration.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
+        configuration.applicationNameForUserAgent = Self.userAgentApplicationName
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.preferences.isElementFullscreenEnabled = true
         #if compiler(>=6.1)

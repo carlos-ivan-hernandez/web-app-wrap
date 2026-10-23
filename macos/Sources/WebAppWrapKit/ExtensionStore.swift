@@ -112,19 +112,13 @@ public struct ExtensionStore {
 
     /// Copies the unpacked extension at `source` into the extensions folder and adds it to the
     /// list, or updates the one with the same name (keeping its app settings). Saves the list.
+    /// The copy gets ExtensionCompat's script.
     @discardableResult
     public func install(from source: URL, manifest: ExtensionManifest, sourceName: String?) throws -> InstalledExtension {
-        let fileManager = FileManager.default
         var list = try load()
         let id = InputNormalizer.slug(manifest.name)
         let existing = list.first { $0.id == id }
-
-        // A new folder for every install, so an app still using the old files isn't disturbed.
-        let tag = "\(InputNormalizer.fileSafeName(manifest.version))-\(UUID().uuidString.prefix(8).lowercased())"
-        let relative = "\(id)/\(tag)"
-        let destination = extensionsFolder.appendingPathComponent(relative, isDirectory: true)
-        try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try fileManager.copyItem(at: source, to: destination)
+        let relative = try addVersion(from: source, id: id, version: manifest.version)
 
         var installed = existing ?? InstalledExtension(id: id, name: manifest.name, version: manifest.version, folder: relative)
         installed.name = manifest.name
@@ -138,14 +132,60 @@ public struct ExtensionStore {
             list.append(installed)
         }
         try save(list)
+        removeVersions(of: id, except: [relative, existing?.folder].compactMap { $0 })
+        return installed
+    }
 
-        // Keep the new version and the one it replaced; older ones are no longer in use.
-        let keep = Set([relative, existing?.folder].compactMap { $0 })
-        let versions = (try? fileManager.contentsOfDirectory(at: destination.deletingLastPathComponent(), includingPropertiesForKeys: nil)) ?? []
+    /// Copies extensions installed with an older ExtensionCompat script (or none) to a new
+    /// folder with the current one. Apps load the new copy the next time they come to the
+    /// front. Returns the IDs of the extensions that were updated.
+    @discardableResult
+    public func updateCompatibility() -> [String] {
+        guard let list = try? load() else { return [] }
+        var updated: [String] = []
+        for item in list where ExtensionCompat.appliedVersion(in: resourceURL(for: item)) != ExtensionCompat.version {
+            let current = resourceURL(for: item)
+            guard FileManager.default.fileExists(atPath: current.path),
+                  let relative = try? addVersion(from: current, id: item.id, version: item.version)
+            else { continue }
+            do {
+                try update(item.id) { $0.folder = relative }
+                removeVersions(of: item.id, except: [relative, item.folder])
+                updated.append(item.id)
+            } catch {
+                try? FileManager.default.removeItem(at: extensionsFolder.appendingPathComponent(relative, isDirectory: true))
+            }
+        }
+        return updated
+    }
+
+    /// Copies `source` to a new folder for extension `id` and adds ExtensionCompat's script.
+    /// Returns the folder, relative to the extensions folder. A new folder for every install,
+    /// so an app still using the old files isn't disturbed.
+    private func addVersion(from source: URL, id: String, version: String) throws -> String {
+        let fileManager = FileManager.default
+        let tag = "\(InputNormalizer.fileSafeName(version))-\(UUID().uuidString.prefix(8).lowercased())"
+        let relative = "\(id)/\(tag)"
+        let destination = extensionsFolder.appendingPathComponent(relative, isDirectory: true)
+        try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileManager.copyItem(at: source, to: destination)
+        do {
+            try ExtensionCompat.apply(to: destination)
+        } catch {
+            try? fileManager.removeItem(at: destination)
+            throw error
+        }
+        return relative
+    }
+
+    /// Keeps the current version and the one it replaced; older ones are no longer in use.
+    private func removeVersions(of id: String, except keep: [String]) {
+        let fileManager = FileManager.default
+        let folder = extensionsFolder.appendingPathComponent(id, isDirectory: true)
+        let versions = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         for version in versions where !keep.contains("\(id)/\(version.lastPathComponent)") {
             try? fileManager.removeItem(at: version)
         }
-        return installed
     }
 
     /// Takes the extension off the list and deletes its files. Apps drop it the next time they

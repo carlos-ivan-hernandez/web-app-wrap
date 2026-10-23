@@ -9,6 +9,8 @@ public struct ExtensionManifest: Equatable {
     public var manifestVersion: Int
     /// API permissions such as "storage" or "tabs" (host patterns are in `hostPermissions`).
     public var permissions: [String]
+    /// API permissions the extension may ask for later.
+    public var optionalPermissions: [String] = []
     /// Sites the extension can read and change: host permissions plus content script matches.
     public var hostPermissions: [String]
     public var isTheme: Bool
@@ -73,6 +75,7 @@ public struct ExtensionManifest: Equatable {
             description: localized(manifest["description"]),
             manifestVersion: manifestVersion,
             permissions: unique(permissions),
+            optionalPermissions: unique((manifest["optional_permissions"] as? [Any] ?? []).compactMap { $0 as? String }.filter { !isHostPattern($0) }),
             hostPermissions: unique(hosts),
             isTheme: manifest["theme"] != nil,
             iconPath: icons?.1
@@ -163,7 +166,7 @@ public struct ExtensionManifest: Equatable {
     }
 
     /// Manifests are JSON, but Chrome tolerates comments in them, so allow those where Foundation can.
-    private static func jsonObject(_ data: Data) -> Any? {
+    static func jsonObject(_ data: Data) -> Any? {
         var data = data
         if data.starts(with: [0xEF, 0xBB, 0xBF]) { data = data.dropFirst(3) }
         if let object = try? JSONSerialization.jsonObject(with: data) { return object }

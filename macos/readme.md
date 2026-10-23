@@ -280,12 +280,23 @@ What to expect:
 - Each app runs its own copy of each extension, with its own settings and
   storage. Settings from your browser don't carry over, and setting up an
   extension in one app doesn't change it in the others.
-- Extensions that need things WebKit doesn't have won't fully work. That
-  includes password managers that talk to their desktop app (native
+- WebKit doesn't have every Chrome API. Installing adds a small script to
+  WebAppWrap's copy of each extension that fills in the missing parts, so an
+  extension that touches one while starting up (Vimium and Stylish both do)
+  still starts. The filled-in parts do nothing: Vimium's search bar, for
+  example, can't suggest bookmarks or history. Extensions installed by an
+  older WebAppWrap get the script the next time WebAppWrap opens.
+- Extensions that depend on things WebKit doesn't have still won't fully work.
+  That includes most extensions that talk to their desktop app (native
   messaging), Chrome sign-in (`identity`), and request blocking with
   `webRequestBlocking`. Use **uBlock Origin Lite** rather than uBlock Origin.
-- Keyboard shortcuts declared in an extension's manifest, side panels and
-  extension items in the right-click menu aren't supported yet.
+- **Bitwarden** works from Chrome's version: the apps answer the messages it
+  would send to its desktop app (the clipboard, saving exports, its timer).
+  Unlocking with Touch ID needs Bitwarden's own desktop app, so it's not
+  available; use your master password or a PIN.
+- Keyboard shortcuts declared in an extension's manifest work in the app's
+  windows. Side panels and extension items in the right-click menu aren't
+  supported yet.
 - Apps made from the command line have no ID in the list, so they always use
   each extension's default.
 
@@ -380,7 +391,10 @@ minimizes the window, following your System Settings.
 Extensions are loaded by `ExtensionHost` with `WKWebExtensionController`.
 Tabs and windows adopt `WKWebExtensionTab` and `WKWebExtensionWindow`, so
 extension APIs such as `tabs.query` and `windows.getCurrent` see the app's real
-tabs.
+tabs. `ExtensionCompat` (in WebAppWrapKit) adds the script that fills in
+missing Chrome APIs when an extension is installed, and `NativeAppStandIns`
+answers messages extensions send to their desktop app. Extension pages and
+background scripts use the same Safari user agent as the tabs.
 
 ```
 Sources/
