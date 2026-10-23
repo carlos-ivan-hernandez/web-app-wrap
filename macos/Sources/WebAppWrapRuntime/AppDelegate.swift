@@ -167,8 +167,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Windows
 
-    /// A new tab's settings. `profile` picks its cookies and site data.
-    func makeWebViewConfiguration(profile: UUID) -> WKWebViewConfiguration {
+    /// A new tab's settings. `profile` picks its cookies and site data. `url` is the page the
+    /// tab will open first, if known.
+    func makeWebViewConfiguration(profile: UUID, for url: URL? = nil) -> WKWebViewConfiguration {
+        #if compiler(>=6.1)
+        // WebKit only serves an extension's own pages (webkit-extension://…/options.html) to a
+        // web view made from that extension's configuration; any other web view gets
+        // NSURLErrorResourceUnavailable (-1008).
+        if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
+           let configuration = extensionHost?.controller.extensionContext(for: url)?.webViewConfiguration {
+            configuration.applicationNameForUserAgent = Self.userAgentApplicationName
+            if configuration.preferences.responds(to: NSSelectorFromString("_developerExtrasEnabled")) {
+                configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+            }
+            return configuration
+        }
+        #endif
+
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = profiles.dataStore(for: profile)
         // Shared by all tabs; it carries the script that forwards notifications.

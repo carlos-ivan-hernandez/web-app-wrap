@@ -165,7 +165,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     ) -> Tab {
         let tab = Tab(
             appDelegate: appDelegate,
-            configuration: configuration ?? appDelegate.makeWebViewConfiguration(profile: profileID)
+            configuration: configuration ?? appDelegate.makeWebViewConfiguration(profile: profileID, for: url)
         )
         tab.host = self
         // Lay the page out at the real size even while it loads in the background.
