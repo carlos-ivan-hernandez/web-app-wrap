@@ -10,10 +10,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private static let trafficLightSpacing: CGFloat = 20
     private static let stripInsetForTrafficLights: CGFloat = 82
     private static let stripInsetInFullScreen: CGFloat = 10
+    /// Top edge of the window (from the top) that reveals the tab strip in full screen.
+    private static let fullScreenRevealHeight: CGFloat = 6
+    private static let stripHideDelay: TimeInterval = 0.4
 
     private unowned let appDelegate: AppDelegate
     private let tabStrip = TabStripView()
     private let contentContainer = NSView()
+    private var stripHeightConstraint: NSLayoutConstraint!
+    private var isFullScreen = false
+    private var isStripRevealed = true
+    private var fullScreenMouseMonitor: Any?
+    private var hideStripWorkItem: DispatchWorkItem?
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
     /// The buttons at the right end of the tab strip: Extensions (shown once any are loaded)
@@ -60,11 +68,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             view.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(view)
         }
+        stripHeightConstraint = tabStrip.heightAnchor.constraint(equalToConstant: Self.stripHeight)
         NSLayoutConstraint.activate([
             tabStrip.topAnchor.constraint(equalTo: root.topAnchor),
             tabStrip.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             tabStrip.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            tabStrip.heightAnchor.constraint(equalToConstant: Self.stripHeight),
+            stripHeightConstraint,
             contentContainer.topAnchor.constraint(equalTo: tabStrip.bottomAnchor),
             contentContainer.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             contentContainer.trailingAnchor.constraint(equalTo: root.trailingAnchor),
@@ -543,11 +552,133 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowWillEnterFullScreen(_ notification: Notification) {
         // The traffic lights move into the hidden menu-bar overlay in full screen.
         tabStrip.leadingInset = Self.stripInsetInFullScreen
+        isFullScreen = true
+    }
+
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        setStripRevealed(false, animated: true)
+        startFullScreenMouseTracking()
+    }
+
+    func windowWillExitFullScreen(_ notification: Notification) {
+        stopFullScreenMouseTracking()
+        isFullScreen = false
+        setStripRevealed(true, animated: false)
     }
 
     func windowDidExitFullScreen(_ notification: Notification) {
         tabStrip.leadingInset = Self.stripInsetForTrafficLights
         layoutTrafficLights()
+    }
+
+    // MARK: - Full screen tab strip auto-hide
+
+    /// In full screen the tab strip hides so the page can use the whole screen. Moving the
+    /// mouse to the top edge reveals it again; moving away hides it after a short delay.
+    private func startFullScreenMouseTracking() {
+        stopFullScreenMouseTracking()
+        fullScreenMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
+            self?.handleFullScreenMouseMoved()
+            return event
+        }
+    }
+
+    private func stopFullScreenMouseTracking() {
+        hideStripWorkItem?.cancel()
+        hideStripWorkItem = nil
+        if let fullScreenMouseMonitor {
+            NSEvent.removeMonitor(fullScreenMouseMonitor)
+            self.fullScreenMouseMonitor = nil
+        }
+    }
+
+    private func handleFullScreenMouseMoved() {
+        guard isFullScreen else { return }
+        if isPointerOverStripOrRevealZone() || isAnyStripMenuOpen() {
+            cancelHideStrip()
+            if !isStripRevealed {
+                setStripRevealed(true, animated: true)
+            }
+        } else if isStripRevealed {
+            scheduleHideStrip()
+        }
+    }
+
+    /// Distance of the pointer from the top of the content view, in points.
+    private func pointerYFromTop() -> CGFloat? {
+        guard let window, let contentView = window.contentView else { return nil }
+        let location = window.mouseLocationOutsideOfEventStream
+        let point = contentView.convert(location, from: nil)
+        return contentView.bounds.height - point.y
+    }
+
+    private func isPointerOverStripOrRevealZone() -> Bool {
+        guard let yFromTop = pointerYFromTop() else { return false }
+        // While the strip is up (or still animating closed), keep it if the pointer is over it.
+        let stripZone = max(stripHeightConstraint.constant, isStripRevealed ? Self.stripHeight : 0)
+        if stripZone > 0 {
+            return yFromTop <= stripZone
+        }
+        return yFromTop <= Self.fullScreenRevealHeight
+    }
+
+    private func isAnyStripMenuOpen() -> Bool {
+        [profileButton, extensionsButton, moreButton].contains(where: \.isShowingMenu)
+    }
+
+    private func scheduleHideStrip() {
+        guard isFullScreen, isStripRevealed, hideStripWorkItem == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.hideStripWorkItem = nil
+            guard self.isFullScreen, self.isStripRevealed else { return }
+            if self.isPointerOverStripOrRevealZone() || self.isAnyStripMenuOpen() { return }
+            self.setStripRevealed(false, animated: true)
+        }
+        hideStripWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.stripHideDelay, execute: work)
+    }
+
+    private func cancelHideStrip() {
+        hideStripWorkItem?.cancel()
+        hideStripWorkItem = nil
+    }
+
+    private func setStripRevealed(_ revealed: Bool, animated: Bool) {
+        let targetHeight: CGFloat = revealed ? Self.stripHeight : 0
+        let targetAlpha: CGFloat = revealed ? 1 : 0
+        guard isStripRevealed != revealed
+                || stripHeightConstraint.constant != targetHeight
+                || tabStrip.alphaValue != targetAlpha
+        else { return }
+        isStripRevealed = revealed
+        cancelHideStrip()
+        let apply = {
+            self.stripHeightConstraint.constant = targetHeight
+            self.tabStrip.alphaValue = targetAlpha
+            // Keep hit-testing off while collapsed so clicks reach the page underneath.
+            self.tabStrip.isHidden = !revealed
+            self.window?.contentView?.layoutSubtreeIfNeeded()
+        }
+        if animated, window?.contentView != nil {
+            // Unhide before animating in so the fade/slide is visible.
+            if revealed { tabStrip.isHidden = false }
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.22
+                context.allowsImplicitAnimation = true
+                self.stripHeightConstraint.animator().constant = targetHeight
+                self.tabStrip.animator().alphaValue = targetAlpha
+                self.window?.contentView?.layoutSubtreeIfNeeded()
+            }, completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.tabStrip.isHidden = !revealed
+                    self.tabStrip.alphaValue = targetAlpha
+                }
+            })
+        } else {
+            apply()
+        }
     }
 
     override func showWindow(_ sender: Any?) {
@@ -556,6 +687,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        stopFullScreenMouseTracking()
         #if compiler(>=6.1)
         if #available(macOS 15.4, *), let extensionController {
             tabs.forEach { extensionController.didCloseTab($0, windowIsClosing: true) }

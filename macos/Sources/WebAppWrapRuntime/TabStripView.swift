@@ -375,7 +375,7 @@ final class TitleBarButton: NSButton {
     private var isHovered = false {
         didSet { if isHovered != oldValue { needsDisplay = true } }
     }
-    private var isShowingMenu = false {
+    private(set) var isShowingMenu = false {
         didSet { needsDisplay = true }
     }
 
