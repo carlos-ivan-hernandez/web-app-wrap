@@ -22,6 +22,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private var isStripRevealed = true
     private var fullScreenMouseMonitor: Any?
     private var hideStripWorkItem: DispatchWorkItem?
+    /// The window's frame when the display went to sleep. While the display is off, macOS can
+    /// report a smaller screen and shrink the window to fit; this puts it back after wake.
+    private var frameBeforeSleep: NSRect?
+    /// After wake, screen changes up to this time still restore `frameBeforeSleep`.
+    private var restoreFrameUntil: Date?
+    private var sleepObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
     /// The buttons at the right end of the tab strip: Extensions (shown once any are loaded)
@@ -112,6 +118,94 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         tabStrip.trailingAccessory = accessoryStack
         refreshProfile()
+        observeSleepAndWake()
+    }
+
+    // MARK: - Sleep and wake
+
+    private func observeSleepAndWake() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        let observe = { [weak self] (center: NotificationCenter, name: Notification.Name, action: @escaping (BrowserWindowController) -> Void) in
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    if let self { action(self) }
+                }
+            }
+            self?.sleepObservers.append((center, token))
+        }
+        observe(workspace, NSWorkspace.willSleepNotification) { $0.rememberFrameForSleep() }
+        observe(workspace, NSWorkspace.screensDidSleepNotification) { $0.rememberFrameForSleep() }
+        observe(workspace, NSWorkspace.didWakeNotification) { $0.restoreFrameAfterWake() }
+        observe(workspace, NSWorkspace.screensDidWakeNotification) { $0.restoreFrameAfterWake() }
+        // Displays often come back a moment after the wake notice, one at a time.
+        observe(.default, NSApplication.didChangeScreenParametersNotification) { $0.screensDidChange() }
+    }
+
+    private func stopObservingSleepAndWake() {
+        for (center, token) in sleepObservers { center.removeObserver(token) }
+        sleepObservers = []
+    }
+
+    private func rememberFrameForSleep() {
+        // Keep the first frame seen: the screens can sleep before the system does.
+        guard frameBeforeSleep == nil, let window, window.isVisible,
+              !window.styleMask.contains(.fullScreen), !window.isMiniaturized
+        else { return }
+        frameBeforeSleep = window.frame
+        restoreFrameUntil = nil
+    }
+
+    private func restoreFrameAfterWake() {
+        guard frameBeforeSleep != nil else {
+            relayoutContent()
+            return
+        }
+        restoreFrameUntil = Date().addingTimeInterval(20)
+        for delay in [0.0, 1.0, 3.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.restoreSavedFrame()
+            }
+        }
+        // Stop restoring once things have settled, so later moves by the user stick.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20.5) { [weak self] in
+            guard let self, let until = self.restoreFrameUntil, until <= Date() else { return }
+            self.frameBeforeSleep = nil
+            self.restoreFrameUntil = nil
+        }
+    }
+
+    private func screensDidChange() {
+        if let until = restoreFrameUntil, until > Date() {
+            restoreSavedFrame()
+        } else {
+            relayoutContent()
+        }
+    }
+
+    private func restoreSavedFrame() {
+        guard let window, let saved = frameBeforeSleep else { return }
+        defer { relayoutContent() }
+        guard !window.styleMask.contains(.fullScreen), !window.isMiniaturized,
+              window.frame != saved,
+              // Only once a screen that can hold the old frame is back.
+              NSScreen.screens.contains(where: { $0.frame.insetBy(dx: -1, dy: -1).contains(saved) })
+        else { return }
+        window.setFrame(saved, display: true)
+    }
+
+    /// Makes the tab strip, page and traffic lights match the window's current size.
+    private func relayoutContent() {
+        guard let window else { return }
+        window.contentView?.needsLayout = true
+        window.contentView?.layoutSubtreeIfNeeded()
+        selectedTab?.webView.frame = contentContainer.bounds
+        layoutTrafficLights()
+    }
+
+    func windowWillStartLiveResize(_ notification: Notification) {
+        // The user is resizing by hand; don't undo it.
+        frameBeforeSleep = nil
+        restoreFrameUntil = nil
     }
 
     // MARK: - Profile
@@ -688,6 +782,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowWillClose(_ notification: Notification) {
         stopFullScreenMouseTracking()
+        stopObservingSleepAndWake()
         #if compiler(>=6.1)
         if #available(macOS 15.4, *), let extensionController {
             tabs.forEach { extensionController.didCloseTab($0, windowIsClosing: true) }
