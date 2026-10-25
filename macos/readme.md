@@ -89,6 +89,7 @@ These are the default shortcuts. Change them in **⋮ → Keyboard Shortcuts…*
 | ⌘T, or the `+` after the last tab | New tab at the base URL |
 | ⌘-click a link | Opens in a new background tab |
 | ⇧⌘-click a link | Opens in a new tab and switches to it |
+| Right-click a link → Open Link in New Tab | Opens in a new background tab (also for images and videos) |
 | ⌘W, or the tab's × (middle-click also works) | Closes the tab. Closing the last tab quits the app |
 | ⇧⌘W | Closes the window and all its tabs |
 | ⌘N | New window |
@@ -100,11 +101,12 @@ These are the default shortcuts. Change them in **⋮ → Keyboard Shortcuts…*
 | ⌘[ / ⌘] | Back / forward (two-finger swipe also works) |
 | ⇧⌘H | Go to the base URL |
 | ⌘R | Reload |
+| ⇧⌘R or ⌥⌘R | Hard reload: the page and everything on it from the server, skipping the cache |
+| ⌘F | Find on the page. Return or ⌘G goes to the next match, ⇧Return or ⇧⌘G to the previous one, Esc closes it |
 | ⌘+ / ⌘- / ⌘0 | Zoom in, zoom out, actual size |
 | ⇧⌘C | Copy the page's link |
 | ⇧⌘O | Open the page in your default browser |
 | ⌥⌘I, or right-click → Inspect Element | Web Inspector (console, network, elements) |
-| ⌥⌘R | Reload, bypassing the cache |
 
 ### Which links stay in the app
 

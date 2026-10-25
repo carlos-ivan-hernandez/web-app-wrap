@@ -44,6 +44,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// Names this window's profile; shown once the app has more than one.
     private let profileButton = TitleBarButton(image: TitleBarButton.profileImage, label: "Profile")
     private var palette: StripPalette
+    /// The Find box (⌘F), floating at the top right of the page.
+    private let findBar = FindBar()
     /// The profile whose logins and site data this window's tabs use.
     let profileID: UUID
     /// How many recent pages the More menu's History submenu lists.
@@ -93,6 +95,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         ])
 
         tabStrip.leadingInset = Self.stripInsetForTrafficLights
+
+        findBar.translatesAutoresizingMaskIntoConstraints = false
+        findBar.isHidden = true
+        root.addSubview(findBar)
+        NSLayoutConstraint.activate([
+            findBar.topAnchor.constraint(equalTo: contentContainer.topAnchor, constant: 8),
+            findBar.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor, constant: -16),
+        ])
+        findBar.onChange = { [weak self] _ in self?.runFind(backwards: false, fromStart: true) }
+        findBar.onNext = { [weak self] in self?.runFind(backwards: false, fromStart: false) }
+        findBar.onPrevious = { [weak self] in self?.runFind(backwards: true, fromStart: false) }
+        findBar.onClose = { [weak self] in self?.closeFind() }
+
         tabStrip.onSelect = { [weak self] index in
             guard let self, self.tabs.indices.contains(index) else { return }
             self.select(self.tabs[index])
@@ -347,8 +362,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             }
             #endif
             refreshExtensionToolbar()
+            if !findBar.isHidden {
+                previous?.endFind()
+                runFind(backwards: false, fromStart: true)
+            }
         }
-        window?.makeFirstResponder(tab.webView)
+        if findBar.isHidden { window?.makeFirstResponder(tab.webView) }
         tabDidChange(tab)
     }
 
@@ -922,8 +941,57 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         selectedTab?.showWebInspector()
     }
 
+    /// Hard Reload: the page and everything on it from the server, skipping the cache.
     @objc func reloadIgnoringCache(_ sender: Any?) {
-        selectedTab?.webView.reloadFromOrigin()
+        selectedTab?.hardReload()
+    }
+
+    // MARK: - Find
+
+    /// Shows the Find box (⌘F), or selects its text if it's already open.
+    @objc func showFind(_ sender: Any?) {
+        findBar.isHidden = false
+        window?.makeFirstResponder(findBar.field)
+        findBar.field.selectText(nil)
+        if !findBar.query.isEmpty { runFind(backwards: false, fromStart: true) }
+    }
+
+    @objc func findNext(_ sender: Any?) {
+        guard !findBar.query.isEmpty else { return showFind(sender) }
+        findBar.isHidden = false
+        runFind(backwards: false, fromStart: false)
+    }
+
+    @objc func findPrevious(_ sender: Any?) {
+        guard !findBar.query.isEmpty else { return showFind(sender) }
+        findBar.isHidden = false
+        runFind(backwards: true, fromStart: false)
+    }
+
+    private func runFind(backwards: Bool, fromStart: Bool) {
+        guard let tab = selectedTab else { return }
+        let query = findBar.query
+        guard !query.isEmpty else {
+            tab.endFind()
+            findBar.showResult(nil)
+            return
+        }
+        tab.find(query, backwards: backwards, fromStart: fromStart) { [weak self] found, count in
+            // Ignore results for a query that has since changed, or a tab no longer shown.
+            guard let self, self.findBar.query == query, self.selectedTab === tab else { return }
+            if !found {
+                self.findBar.showResult("Not found")
+            } else {
+                self.findBar.showResult(count > 1 ? "\(count) matches" : count == 1 ? "1 match" : nil)
+            }
+        }
+    }
+
+    private func closeFind() {
+        findBar.isHidden = true
+        findBar.showResult(nil)
+        tabs.forEach { $0.endFind() }
+        if let tab = selectedTab { window?.makeFirstResponder(tab.webView) }
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {

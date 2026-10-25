@@ -123,7 +123,14 @@ struct ShortcutCommand {
             .init(id: "copyPageLink", title: "Copy Page Link", section: "File", action: #selector(BrowserWindowController.copyPageURL(_:)), defaults: [.init("c", [.command, .shift])]),
             .init(id: "openInBrowser", title: "Open Page in Browser", section: "File", action: #selector(BrowserWindowController.openPageInBrowser(_:)), defaults: [.init("o", [.command, .shift])]),
 
+            .init(id: "find", title: "Find…", section: "Edit", action: #selector(BrowserWindowController.showFind(_:)), defaults: [.init("f")]),
+            .init(id: "findNext", title: "Find Next", section: "Edit", action: #selector(BrowserWindowController.findNext(_:)), defaults: [.init("g")]),
+            .init(id: "findPrevious", title: "Find Previous", section: "Edit", action: #selector(BrowserWindowController.findPrevious(_:)), defaults: [.init("g", [.command, .shift])]),
+
             .init(id: "reload", title: "Reload Page", section: "View", action: #selector(BrowserWindowController.reloadPage(_:)), defaults: [.init("r")]),
+            // The ID predates the name, and keeps shortcuts the user already changed.
+            .init(id: "reloadIgnoringCache", title: "Hard Reload", section: "View", action: #selector(BrowserWindowController.reloadIgnoringCache(_:)),
+                  defaults: [.init("r", [.command, .shift]), .init("r", [.command, .option])]),
             .init(id: "actualSize", title: "Actual Size", section: "View", action: #selector(BrowserWindowController.resetPageZoom(_:)), defaults: [.init("0")]),
             .init(id: "zoomIn", title: "Zoom In", section: "View", action: #selector(BrowserWindowController.zoomInPage(_:)), defaults: [.init("=")]),
             .init(id: "zoomOut", title: "Zoom Out", section: "View", action: #selector(BrowserWindowController.zoomOutPage(_:)), defaults: [.init("-")]),
@@ -135,7 +142,6 @@ struct ShortcutCommand {
             .init(id: "showHistory", title: "Show All History", section: "History", action: #selector(AppDelegate.showHistory(_:)), defaults: [.init("y")]),
 
             .init(id: "webInspector", title: "Show Web Inspector", section: "Developer", action: #selector(BrowserWindowController.showWebInspector(_:)), defaults: [.init("i", [.command, .option])]),
-            .init(id: "reloadIgnoringCache", title: "Reload Ignoring Cache", section: "Developer", action: #selector(BrowserWindowController.reloadIgnoringCache(_:)), defaults: [.init("r", [.command, .option])]),
 
             .init(id: "minimize", title: "Minimize", section: "Window", action: #selector(NSWindow.performMiniaturize(_:)), defaults: [.init("m")]),
             .init(id: "zoom", title: "Zoom", section: "Window", action: #selector(NSWindow.performZoom(_:))),
@@ -159,7 +165,7 @@ struct ShortcutCommand {
         return list
     }()
 
-    static let sections = ["App", "File", "View", "History", "Developer", "Window"]
+    static let sections = ["App", "File", "Edit", "View", "History", "Developer", "Window"]
 
     static func named(_ id: String) -> ShortcutCommand? {
         all.first { $0.id == id }

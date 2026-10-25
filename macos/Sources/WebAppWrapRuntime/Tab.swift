@@ -7,7 +7,7 @@ import WebAppWrapKit
 final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     private static let zoomSteps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3]
 
-    let webView: WKWebView
+    let webView: TabWebView
     weak var host: BrowserWindowController?
     private unowned let appDelegate: AppDelegate
     /// Read fresh each time, so changes to Allowed Sites apply to open tabs.
@@ -17,6 +17,9 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// True while the web view is transparent, before its first page has painted. The window
     /// behind it is the title bar color, so a new tab never flashes white.
     private var isWaitingForFirstPaint = false
+    /// Set when the right-click menu's Open Link in New Tab is chosen, until WebKit asks for
+    /// the new tab, so it opens in the background as in Safari and Chrome.
+    private var opensNextNewTabInBackground = false
 
     /// True until the tab has shown its first page. A fresh tab never spawns further
     /// tabs, and is closed if its only job turned out to be a download or a browser hand-off.
@@ -24,8 +27,16 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     init(appDelegate: AppDelegate, configuration: WKWebViewConfiguration) {
         self.appDelegate = appDelegate
-        self.webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1024, height: 768), configuration: configuration)
+        self.webView = TabWebView(frame: NSRect(x: 0, y: 0, width: 1024, height: 768), configuration: configuration)
         super.init()
+        webView.onOpenInNewTab = { [weak self] in
+            guard let self else { return }
+            self.opensNextNewTabInBackground = true
+            // In case WebKit never asks (e.g. the link was blocked).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                self?.opensNextNewTabInBackground = false
+            }
+        }
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -124,6 +135,89 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
             webView.reload()
         }
     }
+
+    /// Reloads the page and everything on it from the server, skipping the cache.
+    func hardReload() {
+        if let lastFailedURL, webView.url == nil || webView.url?.scheme == "about" {
+            webView.load(URLRequest(url: lastFailedURL, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData))
+        } else {
+            webView.reloadFromOrigin()
+        }
+    }
+
+    // MARK: - Find
+
+    /// Finds `text` on the page, after the current match or before it with `backwards`.
+    /// `fromStart` searches from the start of the current match, for a query that changed.
+    func find(_ text: String, backwards: Bool, fromStart: Bool, completion: @escaping (_ found: Bool, _ count: Int) -> Void) {
+        let configuration = WKFindConfiguration()
+        configuration.backwards = backwards
+        configuration.caseSensitive = false
+        configuration.wraps = true
+        let search = { [weak self] in
+            guard let self else { return }
+            self.webView.find(text, configuration: configuration) { [weak self] result in
+                guard let self else { return }
+                guard result.matchFound else {
+                    self.runFindScript(Self.clearHighlightScript)
+                    completion(false, 0)
+                    return
+                }
+                self.runFindScript(Self.highlightScript, arguments: ["text": text]) { count in
+                    completion(true, count)
+                }
+            }
+        }
+        if fromStart {
+            runFindScript("const s = getSelection(); if (s.rangeCount) s.collapseToStart(); return 0") { _ in search() }
+        } else {
+            search()
+        }
+    }
+
+    /// Removes the highlight of the current match.
+    func endFind() {
+        runFindScript(Self.clearHighlightScript)
+    }
+
+    /// Runs in a separate JavaScript world, so the page's scripts can't interfere. Returns
+    /// the script's number, or 0.
+    private func runFindScript(_ script: String, arguments: [String: Any] = [:], completion: ((Int) -> Void)? = nil) {
+        webView.callAsyncJavaScript(script, arguments: arguments, in: nil, in: .defaultClient) { result in
+            let number = (try? result.get()) as? NSNumber
+            completion?(number?.intValue ?? 0)
+        }
+    }
+
+    /// WebKit selects the match, which shows in gray while the Find box has focus. This
+    /// marks it in yellow, like Safari, and returns how many matches the page's text has.
+    private static let highlightScript = """
+        if (window.CSS && CSS.highlights && window.Highlight) {
+            if (!document.getElementById("webappwrap-find-style")) {
+                const style = document.createElement("style");
+                style.id = "webappwrap-find-style";
+                style.textContent = "::highlight(webappwrap-find) { background-color: #FFE352; color: black; }";
+                (document.head || document.documentElement).appendChild(style);
+            }
+            const selection = getSelection();
+            if (selection.rangeCount) {
+                CSS.highlights.set("webappwrap-find", new Highlight(selection.getRangeAt(0).cloneRange()));
+            }
+        }
+        const haystack = (document.body ? document.body.innerText : "").toLocaleLowerCase();
+        const needle = text.toLocaleLowerCase();
+        let count = 0;
+        for (let at = haystack.indexOf(needle); needle && at !== -1; at = haystack.indexOf(needle, at + needle.length)) {
+            count++;
+        }
+        return count;
+        """
+
+    private static let clearHighlightScript = """
+        if (window.CSS && CSS.highlights) CSS.highlights.delete("webappwrap-find");
+        document.getElementById("webappwrap-find-style")?.remove();
+        return 0;
+        """
 
     func zoomIn() {
         setZoom(Self.zoomSteps.first { $0 > webView.pageZoom + 0.001 } ?? Self.zoomSteps.last!)
@@ -322,7 +416,9 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
         guard let host else { return nil }
 
-        let background = action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift)
+        let background = opensNextNewTabInBackground
+            || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
+        opensNextNewTabInBackground = false
         return host.openTab(url: nil, configuration: configuration, after: self, activate: !background).webView
     }
 
@@ -408,5 +504,42 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         } else {
             completion(alert.runModal())
         }
+    }
+}
+
+/// A tab's web view. Its right-click menu opens links in a new tab, where WebKit's says
+/// "New Window".
+final class TabWebView: WKWebView {
+    /// Called when Open Link (or Image, Video, Frame) in New Tab is chosen, just before
+    /// WebKit opens it.
+    var onOpenInNewTab: (() -> Void)?
+
+    private static let newTabTitles = [
+        "WKMenuItemIdentifierOpenLinkInNewWindow": "Open Link in New Tab",
+        "WKMenuItemIdentifierOpenImageInNewWindow": "Open Image in New Tab",
+        "WKMenuItemIdentifierOpenMediaInNewWindow": "Open Video in New Tab",
+        "WKMenuItemIdentifierOpenFrameInNewWindow": "Open Frame in New Tab",
+    ]
+
+    /// WebKit's own target and action for the items above, while the menu is open.
+    private var originalActions: [ObjectIdentifier: (target: AnyObject?, action: Selector?)] = [:]
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        originalActions = [:]
+        for item in menu.items {
+            guard let id = item.identifier?.rawValue, let title = Self.newTabTitles[id] else { continue }
+            item.title = title
+            // Pass through this view first, then on to WebKit's own action.
+            originalActions[ObjectIdentifier(item)] = (item.target, item.action)
+            item.target = self
+            item.action = #selector(openInNewTab(_:))
+        }
+    }
+
+    @objc private func openInNewTab(_ sender: NSMenuItem) {
+        guard let original = originalActions[ObjectIdentifier(sender)], let action = original.action else { return }
+        onOpenInNewTab?()
+        NSApp.sendAction(action, to: original.target, from: sender)
     }
 }

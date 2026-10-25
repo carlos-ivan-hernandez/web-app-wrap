@@ -11,7 +11,7 @@ enum MainMenu {
 
         menuBar.addItem(submenu(appName, makeAppMenu(appName: appName, shortcuts)))
         menuBar.addItem(submenu("File", makeFileMenu(shortcuts)))
-        menuBar.addItem(submenu("Edit", makeEditMenu()))
+        menuBar.addItem(submenu("Edit", makeEditMenu(shortcuts)))
         menuBar.addItem(submenu("View", makeViewMenu(shortcuts)))
         menuBar.addItem(submenu("History", makeHistoryMenu(shortcuts)))
         let extensionsMenu = NSMenu()
@@ -60,7 +60,7 @@ enum MainMenu {
     }
 
     /// Standard text editing; these shortcuts can't be changed.
-    private static func makeEditMenu() -> NSMenu {
+    private static func makeEditMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
         menu.addItem(item("Undo", Selector(("undo:")), "z"))
         menu.addItem(item("Redo", Selector(("redo:")), "z", [.command, .shift]))
@@ -71,12 +71,20 @@ enum MainMenu {
         menu.addItem(item("Paste and Match Style", #selector(NSTextView.pasteAsPlainText(_:)), "v", [.command, .option, .shift]))
         menu.addItem(item("Delete", #selector(NSText.delete(_:)), ""))
         menu.addItem(item("Select All", #selector(NSText.selectAll(_:)), "a"))
+        menu.addItem(.separator())
+        // Find's shortcuts can be changed, unlike the rest of this menu.
+        let find = NSMenu()
+        add("find", to: find, shortcuts)
+        add("findNext", to: find, shortcuts)
+        add("findPrevious", to: find, shortcuts)
+        menu.addItem(submenu("Find", find))
         return menu
     }
 
     private static func makeViewMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
         add("reload", to: menu, shortcuts)
+        add("reloadIgnoringCache", to: menu, shortcuts)
         menu.addItem(.separator())
         add("actualSize", to: menu, shortcuts)
         add("zoomIn", to: menu, shortcuts)
@@ -99,7 +107,6 @@ enum MainMenu {
     private static func makeDeveloperMenu(_ shortcuts: ShortcutStore) -> NSMenu {
         let menu = NSMenu()
         add("webInspector", to: menu, shortcuts)
-        add("reloadIgnoringCache", to: menu, shortcuts)
         return menu
     }
 
