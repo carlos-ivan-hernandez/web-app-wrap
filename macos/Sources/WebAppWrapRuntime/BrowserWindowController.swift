@@ -22,11 +22,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private var isStripRevealed = true
     private var fullScreenMouseMonitor: Any?
     private var hideStripWorkItem: DispatchWorkItem?
-    /// The window's frame when the display went to sleep. While the display is off, macOS can
-    /// report a smaller screen and shrink the window to fit; this puts it back after wake.
-    private var frameBeforeSleep: NSRect?
-    /// After wake, screen changes up to this time still restore `frameBeforeSleep`.
-    private var restoreFrameUntil: Date?
+    /// The frame the user last gave the window on each arrangement of screens (see
+    /// `screenLayout`). While the display sleeps, during the short display-off wakes a sleeping
+    /// Mac makes, or while a monitor reconnects, macOS can report a smaller screen and shrink
+    /// the window to fit. When the screens are back as they were, so is the window.
+    private var framesByScreenLayout: [String: NSRect] = [:]
+    private var lastScreenChange = Date.distantPast
+    private var screensAreAsleep = false
+    private var systemIsAsleep = false
+    /// Frame changes this soon after a screen change are macOS fitting the window to the
+    /// screens, not the user.
+    private static let screenSettleTime: TimeInterval = 2
     private var sleepObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
@@ -140,7 +146,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         tabStrip.needsDisplay = true
     }
 
-    // MARK: - Sleep and wake
+    // MARK: - Sleep, wake and screen changes
 
     private func observeSleepAndWake() {
         let workspace = NSWorkspace.shared.notificationCenter
@@ -152,11 +158,22 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             }
             self?.sleepObservers.append((center, token))
         }
-        observe(workspace, NSWorkspace.willSleepNotification) { $0.rememberFrameForSleep() }
-        observe(workspace, NSWorkspace.screensDidSleepNotification) { $0.rememberFrameForSleep() }
-        observe(workspace, NSWorkspace.didWakeNotification) { $0.restoreFrameAfterWake() }
-        observe(workspace, NSWorkspace.screensDidWakeNotification) { $0.restoreFrameAfterWake() }
-        // Displays often come back a moment after the wake notice, one at a time.
+        observe(workspace, NSWorkspace.willSleepNotification) {
+            $0.rememberFrame()
+            $0.systemIsAsleep = true
+        }
+        observe(workspace, NSWorkspace.screensDidSleepNotification) {
+            $0.rememberFrame()
+            $0.screensAreAsleep = true
+        }
+        observe(workspace, NSWorkspace.didWakeNotification) {
+            $0.systemIsAsleep = false
+            $0.screensDidChange()
+        }
+        observe(workspace, NSWorkspace.screensDidWakeNotification) {
+            $0.screensAreAsleep = false
+            $0.screensDidChange()
+        }
         observe(.default, NSApplication.didChangeScreenParametersNotification) { $0.screensDidChange() }
     }
 
@@ -165,51 +182,55 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         sleepObservers = []
     }
 
-    private func rememberFrameForSleep() {
-        // Keep the first frame seen: the screens can sleep before the system does.
-        guard frameBeforeSleep == nil, let window, window.isVisible,
-              !window.styleMask.contains(.fullScreen), !window.isMiniaturized
-        else { return }
-        frameBeforeSleep = window.frame
-        restoreFrameUntil = nil
+    /// The screens' sizes and positions, e.g. "{{0, 0}, {2560, 1440}}".
+    private static var screenLayout: String {
+        NSScreen.screens.map { NSStringFromRect($0.frame) }.sorted().joined(separator: " ")
     }
 
-    private func restoreFrameAfterWake() {
-        guard frameBeforeSleep != nil else {
-            relayoutContent()
-            return
-        }
-        restoreFrameUntil = Date().addingTimeInterval(20)
-        for delay in [0.0, 1.0, 3.0] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.restoreSavedFrame()
-            }
-        }
-        // Stop restoring once things have settled, so later moves by the user stick.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 20.5) { [weak self] in
-            guard let self, let until = self.restoreFrameUntil, until <= Date() else { return }
-            self.frameBeforeSleep = nil
-            self.restoreFrameUntil = nil
+    /// True while macOS may be resizing the window to fit the screens rather than the user.
+    private var screensAreSettling: Bool {
+        screensAreAsleep || systemIsAsleep || Date().timeIntervalSince(lastScreenChange) < Self.screenSettleTime
+    }
+
+    /// Saves the window's frame for the current screens.
+    private func rememberFrame() {
+        guard !screensAreSettling, let window, window.isVisible, !window.isMiniaturized,
+              !isFullScreen, !window.styleMask.contains(.fullScreen)
+        else { return }
+        framesByScreenLayout[Self.screenLayout] = window.frame
+    }
+
+    /// The window moved or resized. If the screens stay put, that's the user's choice.
+    private func windowFrameDidChange() {
+        guard !screensAreSettling else { return }
+        // Checked again a moment later, since a resize caused by the screens can arrive just
+        // before the notice that they changed.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            self?.rememberFrame()
         }
     }
 
     private func screensDidChange() {
-        if let until = restoreFrameUntil, until > Date() {
-            restoreSavedFrame()
-        } else {
-            relayoutContent()
+        lastScreenChange = Date()
+        relayoutContent()
+        // Displays often come back a moment after the wake notice, one at a time, and macOS
+        // can fit the window to them again shortly after.
+        for delay in [0.0, 0.5, 1.5, 3.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.restoreFrameForScreens()
+            }
         }
     }
 
-    private func restoreSavedFrame() {
-        guard let window, let saved = frameBeforeSleep else { return }
-        defer { relayoutContent() }
-        guard !window.styleMask.contains(.fullScreen), !window.isMiniaturized,
-              window.frame != saved,
-              // Only once a screen that can hold the old frame is back.
-              NSScreen.screens.contains(where: { $0.frame.insetBy(dx: -1, dy: -1).contains(saved) })
+    /// Puts back the frame the window had the last time the screens were arranged like this.
+    private func restoreFrameForScreens() {
+        guard !screensAreAsleep, !systemIsAsleep, let window, !window.isMiniaturized,
+              !isFullScreen, !window.styleMask.contains(.fullScreen),
+              let saved = framesByScreenLayout[Self.screenLayout], window.frame != saved,
+              NSScreen.screens.contains(where: { $0.frame.insetBy(dx: -1, dy: -1).intersects(saved) })
         else { return }
         window.setFrame(saved, display: true)
+        relayoutContent()
     }
 
     /// Makes the tab strip, page and traffic lights match the window's current size.
@@ -221,10 +242,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         layoutTrafficLights()
     }
 
-    func windowWillStartLiveResize(_ notification: Notification) {
-        // The user is resizing by hand; don't undo it.
-        frameBeforeSleep = nil
-        restoreFrameUntil = nil
+    func windowDidEndLiveResize(_ notification: Notification) {
+        // Dragged by the user, so it counts even right after a screen change.
+        guard let window, !isFullScreen else { return }
+        framesByScreenLayout[Self.screenLayout] = window.frame
     }
 
     // MARK: - Profile
@@ -655,7 +676,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
     }
 
-    func windowDidResize(_ notification: Notification) { layoutTrafficLights() }
+    func windowDidResize(_ notification: Notification) {
+        layoutTrafficLights()
+        windowFrameDidChange()
+    }
+    func windowDidMove(_ notification: Notification) { windowFrameDidChange() }
     func windowDidBecomeKey(_ notification: Notification) {
         layoutTrafficLights()
         appDelegate.profiles.lastUsed = profileID
