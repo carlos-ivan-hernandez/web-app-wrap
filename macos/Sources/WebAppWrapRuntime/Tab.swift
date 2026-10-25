@@ -397,6 +397,32 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.reload()
     }
 
+    // MARK: - Location
+
+    #if compiler(>=6.4)
+    @available(macOS 27.0, *)
+    func webView(
+        _ webView: WKWebView,
+        requestGeolocationPermissionFor origin: WKSecurityOrigin,
+        initiatedBy frame: WKFrameInfo,
+        decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+    ) {
+        decisionHandler(appDelegate.location.allows(origin) ? .grant : .deny)
+    }
+    #endif
+
+    /// Before macOS 27, WebKit asks through this unofficial method instead, and refuses
+    /// location to every page if it's missing.
+    @objc(_webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:)
+    func webViewRequestsLocation(
+        _ webView: WKWebView,
+        origin: WKSecurityOrigin,
+        frame: WKFrameInfo,
+        decisionHandler: @escaping (Bool) -> Void
+    ) {
+        decisionHandler(appDelegate.location.allows(origin))
+    }
+
     // MARK: - New windows (target=_blank, window.open)
 
     func webView(

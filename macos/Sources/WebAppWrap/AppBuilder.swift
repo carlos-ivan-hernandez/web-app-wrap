@@ -113,6 +113,9 @@ enum AppBuilder {
             "NSCameraUsageDescription": "\(name) uses the camera when the web page asks for it.",
             "NSMicrophoneUsageDescription": "\(name) uses the microphone when the web page asks for it.",
             // macOS 15+ asks before an app reaches devices on the local network (e.g. a home server).
+            // For pages that ask for your location (navigator.geolocation).
+            "NSLocationUsageDescription": "\(name) shares your location with the web app when it asks.",
+            "NSLocationWhenInUseUsageDescription": "\(name) shares your location with the web app when it asks.",
             "NSLocalNetworkUsageDescription": "\(name) connects to servers on your local network when the web app uses them.",
             "NSAppTransportSecurity": ["NSAllowsArbitraryLoadsInWebContent": true],
             WrapperInfoKeys.baseURL: spec.baseURL.absoluteString,

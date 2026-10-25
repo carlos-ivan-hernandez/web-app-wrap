@@ -77,6 +77,10 @@ While a tab loads its first page, the space below the bar is the bar's color
 instead of white. Once the page starts to draw, it shows as it would in a
 browser.
 
+Pages on the app's own and allowed sites can ask for your location. macOS asks
+once whether the app may use it; change that in **System Settings → Privacy &
+Security → Location Services**. Other sites are refused.
+
 History only lists pages on the app's own and allowed sites, so pages you
 pass through while signing in elsewhere aren't kept. Each app keeps its own
 history, up to 5,000 visits, in

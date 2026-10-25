@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Forwards the web app's notifications to macOS. Made before launch finishes (see
     /// applicationWillFinishLaunching).
     private(set) var notifications: NotificationBridge!
+    /// Decides which pages may use the Mac's location.
+    private(set) lazy var location = LocationAccess(appDelegate: self)
 
     /// Which links stay in the app: its own site and the allowed sites, as they are now.
     var linkPolicy: LinkPolicy {
