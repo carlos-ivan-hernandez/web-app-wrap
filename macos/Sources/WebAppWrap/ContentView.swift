@@ -22,8 +22,10 @@ struct ContentView: View {
             }
         }
         .frame(width: 620)
-        // Apps can turn extensions on and off from their own Extensions menu.
+        // Apps can turn extensions on and off from their own Extensions menu, and change
+        // their title bar color from their ⋮ menu.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.reloadRecords()
             model.reloadExtensions()
         }
     }

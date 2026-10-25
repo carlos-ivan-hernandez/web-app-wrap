@@ -48,6 +48,23 @@ public struct AppRegistry {
         try encoder.encode(ListFile(apps: records)).write(to: listFile, options: .atomic)
     }
 
+    /// The saved settings of app `id`, or nil if it isn't on the list or the list can't be read.
+    public func settings(of id: UUID) -> AppSettings? {
+        (try? load())?.first { $0.id == id }?.settings
+    }
+
+    /// Changes the saved settings of app `id` and writes the list. Used by the apps
+    /// themselves (e.g. a title bar color picked from the ⋮ menu). Returns false if the app
+    /// isn't on the list.
+    @discardableResult
+    public func updateSettings(of id: UUID, _ change: (inout AppSettings) -> Void) throws -> Bool {
+        var records = try load()
+        guard let index = records.firstIndex(where: { $0.id == id }) else { return false }
+        change(&records[index].settings)
+        try save(records)
+        return true
+    }
+
     // MARK: - Icons
 
     /// Copies `source` into the icons folder and returns its new file name. If it's the same

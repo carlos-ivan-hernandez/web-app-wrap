@@ -141,6 +141,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard hasOpenedFirstWindow else { return }
         // Notifications may have been allowed or turned off in System Settings.
         notifications.refreshSystemStatus()
+        // The title bar color may have been changed in WebAppWrap.
+        if let saved = WrapperConfig.savedTitleBarColor(appID: config.appID), saved != config.titleBarColor,
+           pendingColorSave == nil {
+            applyTitleBarColor(saved)
+        }
         #if compiler(>=6.1)
         if #available(macOS 15.4, *), let host = extensionHost {
             Task { await host.sync() }
@@ -312,6 +317,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shortcutsWindow = ShortcutsWindowController(store: shortcuts, appName: config.appName)
         }
         shortcutsWindow?.showWindow(nil)
+    }
+
+    // MARK: - Title bar color
+
+    /// Saves the picked color once the user pauses, rather than on every move in the color panel.
+    private var pendingColorSave: DispatchWorkItem?
+
+    /// Opens the color panel on the title bar color (⋮ menu). Every window follows the panel
+    /// as it changes, and the color is saved in WebAppWrap's list for this app.
+    @objc func showTitleBarColor(_ sender: Any?) {
+        let panel = NSColorPanel.shared
+        panel.showsAlpha = false
+        panel.isContinuous = true
+        // Clear the action first so setting the starting color doesn't count as a pick.
+        panel.setAction(nil)
+        let color = config.titleBarColor
+        panel.color = NSColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: 1)
+        panel.title = "\(config.appName) Title Bar Color"
+        panel.setTarget(self)
+        panel.setAction(#selector(titleBarColorPicked(_:)))
+        panel.orderFront(nil)
+    }
+
+    @objc private func titleBarColorPicked(_ sender: NSColorPanel) {
+        guard let rgb = sender.color.usingColorSpace(.sRGB) else { return }
+        let color = HexColor(red: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent)
+        guard color != config.titleBarColor else { return }
+        applyTitleBarColor(color)
+
+        guard let appID = config.appID else { return }
+        pendingColorSave?.cancel()
+        let save = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingColorSave = nil
+            let hex = self.config.titleBarColor.hexString
+            do {
+                let found = try AppRegistry.standard.updateSettings(of: appID) { $0.titleBarColor = hex }
+                if !found { self.reportColorNotSaved("\(self.config.appName) is no longer in WebAppWrap’s list of apps.") }
+            } catch {
+                self.reportColorNotSaved(error.localizedDescription)
+            }
+        }
+        pendingColorSave = save
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: save)
+    }
+
+    private func applyTitleBarColor(_ color: HexColor) {
+        config.titleBarColor = color
+        windowControllers.forEach { $0.setTitleBarColor(color) }
+    }
+
+    private func reportColorNotSaved(_ reason: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "The title bar color couldn’t be saved in WebAppWrap"
+        alert.informativeText = "\(reason) The new color lasts until \(config.appName) quits."
+        alert.runModal()
     }
 
     // MARK: - Notifications

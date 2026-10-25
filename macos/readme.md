@@ -59,6 +59,13 @@ The **⋮** menu has:
   you're in, and the app opens in the profile you used last. The first profile
   keeps the logins the app had before profiles existed. History and Allowed
   Sites are shared by all profiles. Extra profiles need macOS 14 or later.
+- **Title Bar Color…**: opens the macOS color panel. The bar in every window
+  changes as you pick, and the color is saved as the app's title bar color in
+  WebAppWrap's list, so it stays after the app quits and WebAppWrap's edit form
+  shows it. WebAppWrap then lists the app as changed, and rebuilding it builds
+  in the same color. Apps made from the command line aren't in the list, so the
+  color lasts only until they quit. A color changed in WebAppWrap also reaches
+  an open app the next time you switch to it.
 - **Keyboard Shortcuts…**: change the shortcut of any menu command (also in the
   app menu). Click **Change** and press the new keys, or use the **…** menu to
   add another shortcut, remove them, or restore the default. Giving a command a

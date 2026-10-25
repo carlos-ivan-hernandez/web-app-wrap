@@ -5,7 +5,9 @@ import WebAppWrapKit
 struct WrapperConfig {
     let appName: String
     let baseURL: URL
-    let titleBarColor: HexColor
+    /// The color the app was built with, unless one was saved in WebAppWrap's list since
+    /// (for example from the ⋮ menu's Title Bar Color).
+    var titleBarColor: HexColor
     /// The app's ID in WebAppWrap's list, for its extension settings. nil for apps made from the command line.
     let appID: UUID?
 
@@ -24,8 +26,17 @@ struct WrapperConfig {
             ?? url.host
             ?? ProcessInfo.processInfo.processName
         // Apps made before the color setting existed get the default.
-        let color = (info[WrapperInfoKeys.titleBarColor] as? String).flatMap(HexColor.init(hex:)) ?? .defaultTitleBar
+        var color = (info[WrapperInfoKeys.titleBarColor] as? String).flatMap(HexColor.init(hex:)) ?? .defaultTitleBar
         let appID = (info[WrapperInfoKeys.appID] as? String).flatMap(UUID.init(uuidString:))
+        if let saved = savedTitleBarColor(appID: appID) {
+            color = saved
+        }
         return WrapperConfig(appName: name, baseURL: url, titleBarColor: color, appID: appID)
+    }
+
+    /// The title bar color saved for this app in WebAppWrap's list, if any.
+    static func savedTitleBarColor(appID: UUID?) -> HexColor? {
+        guard let appID else { return nil }
+        return AppRegistry.standard.settings(of: appID)?.titleBarColor.flatMap(HexColor.init(hex:))
     }
 }

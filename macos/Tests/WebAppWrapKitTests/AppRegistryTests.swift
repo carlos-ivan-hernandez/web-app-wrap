@@ -97,6 +97,17 @@ final class AppRegistryTests: XCTestCase {
         XCTAssertEqual(try registry.load(), [])
     }
 
+    func testUpdateSettingsChangesOnlyThatApp() throws {
+        let photos = AppRecord(settings: AppSettings(name: "Photos", url: "https://photos.google.com"))
+        let mail = AppRecord(settings: AppSettings(name: "Mail", url: "https://mail.google.com", titleBarColor: "#FFFFFF"))
+        try registry.save([photos, mail])
+
+        XCTAssertTrue(try registry.updateSettings(of: photos.id) { $0.titleBarColor = "#336699" })
+        XCTAssertEqual(registry.settings(of: photos.id)?.titleBarColor, "#336699")
+        XCTAssertEqual(registry.settings(of: mail.id)?.titleBarColor, "#FFFFFF")
+        XCTAssertFalse(try registry.updateSettings(of: UUID()) { $0.titleBarColor = "#000000" })
+    }
+
     func testSaveAndLoad() throws {
         let stamp = BuildStamp(version: "abc", date: Date(timeIntervalSince1970: 1_700_000_000), settings: AppSettings(name: "A", url: "https://a.com"))
         let records = [

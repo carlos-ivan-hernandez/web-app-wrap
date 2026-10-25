@@ -54,6 +54,19 @@ final class BuilderModel: ObservableObject {
 
     // MARK: - The list
 
+    /// Reads apps.json again. Apps change their own settings there (e.g. the title bar color
+    /// from their ⋮ menu), and the list is always saved whole, so it must be current first.
+    func reloadRecords() {
+        guard !status.isBusy, FileManager.default.fileExists(atPath: registry.listFile.path) else { return }
+        do {
+            let loaded = try registry.load()
+            if loaded != records { records = loaded }
+            loadError = nil
+        } catch {
+            loadError = "\(registry.listFile.path) couldn’t be read: \(error.localizedDescription)"
+        }
+    }
+
     func findRecord(_ id: UUID) -> AppRecord? {
         records.first { $0.id == id }
     }

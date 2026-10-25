@@ -37,7 +37,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let moreButton = TitleBarButton(image: TitleBarButton.kebabImage, label: "More")
     /// Names this window's profile; shown once the app has more than one.
     private let profileButton = TitleBarButton(image: TitleBarButton.profileImage, label: "Profile")
-    private let palette: StripPalette
+    private var palette: StripPalette
     /// The profile whose logins and site data this window's tabs use.
     let profileID: UUID
     /// How many recent pages the More menu's History submenu lists.
@@ -87,8 +87,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         ])
 
         tabStrip.leadingInset = Self.stripInsetForTrafficLights
-        tabStrip.palette = palette
-        window.backgroundColor = palette.background
         tabStrip.onSelect = { [weak self] index in
             guard let self, self.tabs.indices.contains(index) else { return }
             self.select(self.tabs[index])
@@ -105,10 +103,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         accessoryStack.orientation = .horizontal
         accessoryStack.spacing = 0
         for button in [profileButton, extensionsButton, moreButton] {
-            button.contentTintColor = palette.foreground.withAlphaComponent(0.7)
-            button.hoverColor = palette.foreground
             accessoryStack.addArrangedSubview(button)
         }
+        applyPalette()
         extensionsButton.isHidden = true
         extensionsButton.onPress = { [weak self] button in self?.showExtensionsMenu(from: button) }
         moreButton.onPress = { [weak self] button in self?.showMoreMenu(from: button) }
@@ -119,6 +116,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         tabStrip.trailingAccessory = accessoryStack
         refreshProfile()
         observeSleepAndWake()
+    }
+
+    // MARK: - Title bar color
+
+    /// Recolors the tab strip and its buttons, e.g. while a color is picked from the ⋮ menu.
+    func setTitleBarColor(_ color: HexColor) {
+        palette = StripPalette(color: color)
+        applyPalette()
+    }
+
+    private func applyPalette() {
+        tabStrip.palette = palette
+        window?.backgroundColor = palette.background
+        for button in [profileButton, extensionsButton, moreButton] {
+            button.contentTintColor = palette.foreground.withAlphaComponent(0.7)
+            button.hoverColor = palette.foreground
+        }
+        refreshProfile()
+        tabStrip.needsDisplay = true
     }
 
     // MARK: - Sleep and wake
@@ -452,6 +468,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
         profileItem.submenu = makeProfileMenu()
         menu.addItem(profileItem)
+        let color = menuItem("Title Bar Color…", #selector(AppDelegate.showTitleBarColor(_:)), "")
+        color.toolTip = appDelegate.config.appID == nil
+            ? "This app wasn’t made from WebAppWrap’s list, so a color picked here lasts until it quits."
+            : "Changes this bar’s color and saves it in WebAppWrap for this app."
+        menu.addItem(color)
         menu.addItem(shortcuts.menuItem(for: "keyboardShortcuts"))
         menu.addItem(.separator())
         menu.addItem(shortcuts.menuItem(for: "copyPageLink"))
