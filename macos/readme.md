@@ -73,6 +73,10 @@ The **⋮** menu has:
   can't be changed. Each app keeps its own shortcuts.
 - **Copy Page Link** and **Open Page in Browser**.
 
+While a tab loads its first page, the space below the bar is the bar's color
+instead of white. Once the page starts to draw, it shows as it would in a
+browser.
+
 History only lists pages on the app's own and allowed sites, so pages you
 pass through while signing in elsewhere aren't kept. Each app keeps its own
 history, up to 5,000 visits, in

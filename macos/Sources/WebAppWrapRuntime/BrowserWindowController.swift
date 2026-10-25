@@ -129,6 +129,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private func applyPalette() {
         tabStrip.palette = palette
         window?.backgroundColor = palette.background
+        // Shows behind a tab's page until it first paints (see Tab).
+        contentContainer.wantsLayer = true
+        contentContainer.layer?.backgroundColor = palette.background.cgColor
         for button in [profileButton, extensionsButton, moreButton] {
             button.contentTintColor = palette.foreground.withAlphaComponent(0.7)
             button.hoverColor = palette.foreground

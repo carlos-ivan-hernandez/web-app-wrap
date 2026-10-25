@@ -14,6 +14,9 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     private var policy: LinkPolicy { appDelegate.linkPolicy }
     private var observations: [NSKeyValueObservation] = []
     private var lastFailedURL: URL?
+    /// True while the web view is transparent, before its first page has painted. The window
+    /// behind it is the title bar color, so a new tab never flashes white.
+    private var isWaitingForFirstPaint = false
 
     /// True until the tab has shown its first page. A fresh tab never spawns further
     /// tabs, and is closed if its only job turned out to be a download or a browser hand-off.
@@ -32,6 +35,7 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
         if #available(macOS 13.3, *) {
             webView.isInspectable = true
         }
+        setDrawsBackground(false)
 
         // KVO calls these on the main thread, outside the main actor's knowledge.
         let onChange: (@escaping @MainActor (Tab) -> Void) -> (Any, Any) -> Void = { [weak self] action in
@@ -232,9 +236,11 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         recordVisit()
+        if isWaitingForFirstPaint { restoreBackgroundAfterFirstPaint() }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        drawBackground()
         if webView.url?.scheme != "about" { lastFailedURL = nil }
         host?.tabDidChange(self)
     }
@@ -252,6 +258,45 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
             ErrorPage.html(title: "Can’t open this page", message: nsError.localizedDescription, retryURL: failingURL),
             baseURL: nil
         )
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        drawBackground()
+    }
+
+    // MARK: - First paint
+
+    /// WebKit paints a white page until the first page draws. Turning that off shows the
+    /// window's title bar color instead. There's no public switch for it on macOS, so this
+    /// is skipped if WebKit ever drops the private one.
+    private func setDrawsBackground(_ draws: Bool) {
+        guard webView.responds(to: NSSelectorFromString("_setDrawsBackground:"))
+            || webView.responds(to: NSSelectorFromString("setDrawsBackground:"))
+        else { return }
+        webView.setValue(draws, forKey: "drawsBackground")
+        isWaitingForFirstPaint = !draws
+    }
+
+    /// Pages that set no background of their own rely on WebKit's white one, so it comes
+    /// back once the page is about to paint: after its HTML and blocking styles have loaded
+    /// and two animation frames have passed. didFinish and didFail also bring it back, for
+    /// tabs in the background, where animation frames don't run.
+    private func restoreBackgroundAfterFirstPaint() {
+        let script = """
+            if (document.readyState === "loading") {
+                await new Promise(resolve => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
+            }
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            """
+        // A separate JavaScript world, so the page's own scripts can't interfere.
+        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .defaultClient) { [weak self] result in
+            // A failure means the page was replaced; its own commit or finish handles that.
+            if case .success = result { self?.drawBackground() }
+        }
+    }
+
+    private func drawBackground() {
+        if isWaitingForFirstPaint { setDrawsBackground(true) }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
