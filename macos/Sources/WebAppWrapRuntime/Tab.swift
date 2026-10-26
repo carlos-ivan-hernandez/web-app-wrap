@@ -80,7 +80,18 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func load(_ url: URL) {
+        requestedURL = url
         webView.load(URLRequest(url: url))
+    }
+
+    /// The last page asked for with load(_:), in case it never committed.
+    private var requestedURL: URL?
+
+    /// The page to reopen this tab at when the app next launches: the page showing, or the
+    /// one that failed to load or hasn't loaded yet.
+    var pageToReopen: URL? {
+        if let url = webView.url, BrowsingHistory.isRecordable(url) { return url }
+        return lastFailedURL ?? requestedURL
     }
 
     /// Called when the tab is removed. Stops everything so the web view can be released.

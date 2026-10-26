@@ -51,6 +51,12 @@ The **⋮** menu has:
   also need notifications turned on in their own settings, for example Gmail's
   **Settings → Desktop notifications**. If notifications are turned off for the
   app in **System Settings → Notifications**, the switch offers to open it.
+- **Reopen Tabs at Launch**: a switch, on by default. While it's on, the app
+  opens with the windows and tabs it had when it last quit, each in its profile
+  and at its size and position, with the same tab selected. Quitting by closing
+  the last window counts too. Tabs on sites the app no longer allows, and
+  windows of deleted profiles, are skipped. Turn it off to always start with one
+  window at the app's web address.
 - **Profile**: each profile has its own logins, cookies and site data, so you
   can be signed in to two accounts on the same site (for example two Instagram
   accounts) in different windows. Choose a profile to bring its window forward
@@ -85,6 +91,8 @@ History only lists pages on the app's own and allowed sites, so pages you
 pass through while signing in elsewhere aren't kept. Each app keeps its own
 history, up to 5,000 visits, in
 `~/Library/Application Support/<bundle ID>/history.json`.
+The open windows and tabs are saved next to it, in `tabs.json`, a second after
+each change, so they survive the app being forced to quit.
 
 These are the default shortcuts. Change them in **⋮ → Keyboard Shortcuts…**.
 

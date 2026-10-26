@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// start in a browser they don't recognize.
     static let userAgentApplicationName = "Version/18.0 Safari/605.1.15"
     private static let pageZoomKey = "PageZoom"
+    private static let reopensTabsKey = "ReopensTabs"
 
     private(set) var config: WrapperConfig!
     let downloads = DownloadManager()
@@ -134,7 +135,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func openFirstWindow() {
         guard !hasOpenedFirstWindow else { return }
         hasOpenedFirstWindow = true
-        openWindow(profile: profiles.lastUsed)
+        if !reopenSavedTabs() {
+            openWindow(profile: profiles.lastUsed)
+        }
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -161,6 +164,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         history.saveNow()
+        saveTabsNow()
+    }
+
+    // MARK: - Reopening tabs
+
+    /// Whether the app reopens the windows and tabs it had when it quit (⋮ menu). On by default.
+    var reopensTabs: Bool {
+        get { UserDefaults.standard.object(forKey: Self.reopensTabsKey) as? Bool ?? true }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.reopensTabsKey)
+            if newValue {
+                saveTabsNow()
+            } else {
+                pendingTabsSave?.cancel()
+                pendingTabsSave = nil
+                try? FileManager.default.removeItem(at: Self.savedTabsFile)
+            }
+        }
+    }
+
+    @objc func toggleReopenTabs(_ sender: Any?) {
+        reopensTabs.toggle()
+    }
+
+    /// Next to history.json.
+    private static var savedTabsFile: URL {
+        HistoryController.defaultFile.deletingLastPathComponent().appendingPathComponent("tabs.json")
+    }
+
+    private var pendingTabsSave: DispatchWorkItem?
+    /// Set while the last window closes. Closing it quits the app, and its tabs were saved
+    /// just before, so the empty list of windows that follows isn't saved over them.
+    private var isClosingLastWindow = false
+
+    /// A tab opened, closed, moved or changed page, or a window moved. Saves a moment later,
+    /// so the tabs are kept even if the app doesn't quit normally.
+    func tabsDidChange() {
+        guard reopensTabs, hasOpenedFirstWindow, !isClosingLastWindow else { return }
+        pendingTabsSave?.cancel()
+        let save = DispatchWorkItem { [weak self] in self?.saveTabsNow() }
+        pendingTabsSave = save
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: save)
+    }
+
+    private func saveTabsNow() {
+        pendingTabsSave?.cancel()
+        pendingTabsSave = nil
+        guard reopensTabs, hasOpenedFirstWindow, !isClosingLastWindow else { return }
+        let saved = SavedTabs(windows: orderedWindowControllers.compactMap(\.savedTabs))
+        do {
+            try saved.save(to: Self.savedTabsFile)
+        } catch {
+            NSLog("WebAppWrap: couldn’t save the open tabs: %@", error.localizedDescription)
+        }
+    }
+
+    /// Opens the windows and tabs saved when the app last quit. Returns false if there are none
+    /// to open (or reopening is off), so the app opens its usual window instead.
+    private func reopenSavedTabs() -> Bool {
+        guard reopensTabs else { return false }
+        let policy = linkPolicy
+        let saved = SavedTabs.load(from: Self.savedTabsFile).reopenable(
+            isAllowed: { policy.isInternal($0) },
+            profileExists: { id in self.profiles.list.contains { $0.id == id } }
+        )
+        guard !saved.windows.isEmpty else { return false }
+        // Back to front, so the front window ends up in front.
+        for window in saved.windows.reversed() {
+            let controller = makeWindow(profile: window.profile)
+            if let frame = window.frame, let nsWindow = controller.window,
+               NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
+                nsWindow.setFrame(frame, display: false)
+            }
+            controller.showWindow(nil)
+            for (index, url) in window.tabs.enumerated() {
+                controller.openTab(url: url, activate: index == window.selected)
+            }
+        }
+        return true
     }
 
     /// Closing the last tab (cmd+W) quits the app.
@@ -215,7 +297,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// default the front window's).
     @discardableResult
     func openWindow(url: URL? = nil, profile: UUID? = nil) -> BrowserWindowController {
-        let profile = profile ?? frontWindowController?.profileID ?? profiles.lastUsed
+        let controller = makeWindow(profile: profile ?? frontWindowController?.profileID ?? profiles.lastUsed)
+        controller.showWindow(nil)
+        controller.openTab(url: url ?? config.baseURL)
+        return controller
+    }
+
+    /// A new window with no tabs, placed but not shown yet.
+    private func makeWindow(profile: UUID) -> BrowserWindowController {
+        isClosingLastWindow = false
         let controller = BrowserWindowController(appDelegate: self, profileID: profile)
         windowControllers.append(controller)
         #if compiler(>=6.1)
@@ -224,8 +314,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
         if let window = controller.window { positionNewWindow(window) }
-        controller.showWindow(nil)
-        controller.openTab(url: url ?? config.baseURL)
         return controller
     }
 
@@ -245,8 +333,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Called before a window's tabs are closed.
+    func windowWillClose(_ controller: BrowserWindowController) {
+        if windowControllers.count == 1, windowControllers.first === controller {
+            // The app quits once its last window closes; keep this window's tabs for next time.
+            saveTabsNow()
+            isClosingLastWindow = true
+        }
+    }
+
     func windowDidClose(_ controller: BrowserWindowController) {
         windowControllers.removeAll { $0 === controller }
+        tabsDidChange()
     }
 
     /// Open windows, frontmost first.

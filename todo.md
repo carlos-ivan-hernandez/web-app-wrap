@@ -70,6 +70,12 @@ have them yet:
       batch files and the command line. SkiaSharp can't read SVG; the
       `Svg.Skia` package can. See `IconSource.svg` and `IconSource.load` in
       `macos/Sources/WebAppWrap/IconRenderer.swift`, and `AppDraft.swift`.
+- [ ] **Reopen Tabs at Launch** in the ⋮ menu (on by default): save each
+      window's tabs, selected tab, profile and position to `tabs.json` next to
+      `history.json` a second after each change and when the last window
+      closes, and reopen them at launch, skipping sites no longer allowed. See
+      `macos/Sources/WebAppWrapKit/SavedTabs.swift` and the "Reopening tabs"
+      part of `WebAppWrapRuntime/AppDelegate.swift`.
 
 On macOS, the code to follow is:
 

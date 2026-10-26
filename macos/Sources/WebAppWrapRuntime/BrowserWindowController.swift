@@ -218,6 +218,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// The window moved or resized. If the screens stay put, that's the user's choice.
     private func windowFrameDidChange() {
         guard !screensAreSettling else { return }
+        appDelegate.tabsDidChange()
         // Checked again a moment later, since a resize caused by the screens can arrive just
         // before the notice that they changed.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
@@ -508,6 +509,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         notify.state = notifications.isEnabled && notifications.isAllowedBySystem ? .on : .off
         notify.toolTip = "Shows the site’s notifications in macOS Notification Center."
         menu.addItem(notify)
+        let reopen = menuItem("Reopen Tabs at Launch", #selector(AppDelegate.toggleReopenTabs(_:)), "")
+        reopen.state = appDelegate.reopensTabs ? .on : .off
+        reopen.toolTip = "Opens the windows and tabs that were open when \(appDelegate.config.appName) last quit."
+        menu.addItem(reopen)
         let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
         profileItem.submenu = makeProfileMenu()
         menu.addItem(profileItem)
@@ -656,6 +661,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             items: tabs.map { TabStripView.Item(title: $0.displayTitle, isLoading: $0.webView.isLoading) },
             selectedIndex: selectedTab.flatMap { tabs.firstIndex(of: $0) }
         )
+        appDelegate.tabsDidChange()
+    }
+
+    /// This window's tabs and frame, to reopen at the next launch. nil if no tab has a page
+    /// worth reopening.
+    var savedTabs: SavedTabs.Window? {
+        var pages: [URL] = []
+        var selected = 0
+        for tab in tabs {
+            guard let page = tab.pageToReopen else { continue }
+            if tab === selectedTab { selected = pages.count }
+            pages.append(page)
+        }
+        guard !pages.isEmpty else { return nil }
+        // The frame from before full screen; a reopened window starts out of full screen.
+        let frame = isFullScreen || window?.styleMask.contains(.fullScreen) == true
+            ? framesByScreenLayout[Self.screenLayout] : window?.frame
+        return SavedTabs.Window(profile: profileID, tabs: pages, selected: selected, frame: frame)
     }
 
     private func selectTab(offset: Int) {
@@ -703,6 +726,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowDidBecomeKey(_ notification: Notification) {
         layoutTrafficLights()
         appDelegate.profiles.lastUsed = profileID
+        // The front window is saved first.
+        appDelegate.tabsDidChange()
         #if compiler(>=6.1)
         if #available(macOS 15.4, *) {
             extensionController?.didFocusWindow(self)
@@ -849,6 +874,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        // Before the tabs go, in case this is the last window and the app is quitting.
+        appDelegate.windowWillClose(self)
         stopFullScreenMouseTracking()
         stopObservingSleepAndWake()
         #if compiler(>=6.1)
