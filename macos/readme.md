@@ -411,6 +411,15 @@ missing Chrome APIs when an extension is installed, and `NativeAppStandIns`
 answers messages extensions send to their desktop app. Extension pages and
 background scripts use the same Safari user agent as the tabs.
 
+After a site is updated, its service worker can keep serving the old page, whose
+scripts are gone from the server; sites that send every unknown path to
+`index.html` then answer with HTML, and the page breaks with "'text/html' is not a
+valid JavaScript MIME type". `StaleSiteRecovery` catches this: a script in each
+page reports the site's own scripts that fail to load, and if the server confirms
+a script is gone (a 404, or HTML in its place), the app clears that site's
+service worker and caches (not its cookies or local storage) and reloads the tab
+from the network, at most once a minute per site.
+
 ```
 Sources/
   WebAppWrap/       the generator app (SwiftUI) and its command line

@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Forwards the web app's notifications to macOS. Made before launch finishes (see
     /// applicationWillFinishLaunching).
     private(set) var notifications: NotificationBridge!
+    /// Reloads tabs stuck on an old copy of a site after the site was updated.
+    private var staleSiteRecovery: StaleSiteRecovery?
     /// Decides which pages may use the Mac's location.
     private(set) lazy var location = LocationAccess(appDelegate: self)
 
@@ -75,6 +77,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         notifications = NotificationBridge(appDelegate: self)
+        // Shares the notifications' content controller, which every tab uses.
+        staleSiteRecovery = StaleSiteRecovery(appDelegate: self, userContentController: notifications.userContentController)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

@@ -123,6 +123,8 @@ final class NotificationBridge: NSObject, WKScriptMessageHandler, UNUserNotifica
         userContentController.removeAllUserScripts()
         let source = Self.script.replacingOccurrences(of: "__WAW_PERMISSION__", with: pagePermission)
         userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        // removeAllUserScripts took this one out too.
+        StaleSiteRecovery.addScript(to: userContentController)
     }
 
     /// New pages get the new permission from the script; open pages are told directly.
