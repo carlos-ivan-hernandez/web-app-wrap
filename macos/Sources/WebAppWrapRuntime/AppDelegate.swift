@@ -294,6 +294,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if configuration.preferences.responds(to: NSSelectorFromString("_developerExtrasEnabled")) {
             configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         }
+        // Lets videos pop out into the floating picture-in-picture window, as in Safari. Off by
+        // default in WKWebView, so requestPictureInPicture() fails with NotSupportedError. Also
+        // private, and skipped the same way.
+        if configuration.preferences.responds(to: NSSelectorFromString("_allowsPictureInPictureMediaPlayback")) {
+            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        }
         return configuration
     }
 
