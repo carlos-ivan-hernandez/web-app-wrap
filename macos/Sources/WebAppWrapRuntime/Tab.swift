@@ -415,7 +415,7 @@ final class Tab: NSObject, WKNavigationDelegate, WKUIDelegate {
     func webView(
         _ webView: WKWebView,
         requestGeolocationPermissionFor origin: WKSecurityOrigin,
-        initiatedBy frame: WKFrameInfo,
+        initiatedByFrame frame: WKFrameInfo,
         decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
     ) {
         decisionHandler(appDelegate.location.allows(origin) ? .grant : .deny)
