@@ -33,6 +33,9 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
     struct Loaded {
         let installed: InstalledExtension
         let context: WKWebExtensionContext
+        /// WebKit gives every extension an action, so the manifest says whether there's really
+        /// a toolbar button to click.
+        let hasToolbarButton: Bool
     }
 
     /// Loaded extensions, in the order of WebAppWrap's list.
@@ -89,7 +92,8 @@ final class ExtensionHost: NSObject, WKWebExtensionControllerDelegate {
             for item in wanted where !loaded.contains(where: { $0.installed.id == item.id }) {
                 do {
                     let context = try await load(item)
-                    loaded.append(Loaded(installed: item, context: context))
+                    let manifest = try? ExtensionManifest.read(from: store.resourceURL(for: item))
+                    loaded.append(Loaded(installed: item, context: context, hasToolbarButton: manifest?.hasToolbarButton ?? true))
                     failures[item.id] = nil
                 } catch {
                     failures[item.id] = error.localizedDescription

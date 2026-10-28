@@ -37,6 +37,15 @@ final class ExtensionManifestTests: XCTestCase {
         XCTAssertEqual(manifest.unsupportedPermissions.count, 1)
     }
 
+    func testToolbarButton() throws {
+        func parse(_ extra: String) throws -> ExtensionManifest {
+            try ExtensionManifest.parse(Data(#"{"manifest_version": 3, "name": "A", "version": "1"\#(extra)}"#.utf8))
+        }
+        XCTAssertFalse(try parse(#", "content_scripts": [{"matches": ["<all_urls>"], "js": ["a.js"]}]"#).hasToolbarButton)
+        XCTAssertTrue(try parse(#", "action": {}"#).hasToolbarButton)
+        XCTAssertTrue(try parse(#", "browser_action": {"default_popup": "p.html"}"#).hasToolbarButton)
+    }
+
     func testLocalizedName() throws {
         let manifest = try ExtensionManifest.parse(Data(#"""
         {"manifest_version": 3, "name": "__MSG_extName__", "description": "__MSG_missing__",

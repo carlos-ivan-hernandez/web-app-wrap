@@ -468,13 +468,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                     icon.size = iconSize
                     entry.image = icon
                 }
-                if let action {
+                if let action, item.hasToolbarButton {
                     entry.isEnabled = action.isEnabled
                     if !action.label.isEmpty, action.label != item.installed.name { entry.toolTip = action.label }
                     if !action.badgeText.isEmpty { entry.badge = NSMenuItemBadge(string: action.badgeText) }
                 } else {
-                    entry.isEnabled = false
-                    entry.toolTip = "This extension has no toolbar button."
+                    // Nothing to click, but it's on: shown at full strength, without the hover
+                    // highlight. A disabled item would look off.
+                    entry.view = Self.unclickableMenuRow(
+                        title: item.installed.name,
+                        toolTip: "\(item.installed.name) has no toolbar button. It works on its own in pages."
+                    )
                 }
                 menu.addItem(entry)
             }
@@ -485,6 +489,22 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             ExtensionsMenuController.openGenerator()
         })
         button.popUp(menu)
+    }
+
+    /// A menu row that looks like an enabled item but doesn't highlight or respond to clicks.
+    /// Menu items with their own view don't highlight, so this draws the title itself, lined
+    /// up with the titles of the other items.
+    private static func unclickableMenuRow(title: String, toolTip: String) -> NSView {
+        let label = NSTextField(labelWithString: title)
+        label.font = .menuFont(ofSize: 0)
+        label.sizeToFit()
+        // A label draws its text 2 points in, so 14 lines it up with items' 16.
+        let leading: CGFloat = 14, height: CGFloat = 24
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: leading + label.frame.width + 20, height: height))
+        label.frame.origin = NSPoint(x: leading, y: ((height - label.frame.height) / 2).rounded())
+        row.addSubview(label)
+        row.toolTip = toolTip
+        return row
     }
 
     // MARK: - More menu, Open Link and History

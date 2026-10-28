@@ -14,6 +14,9 @@ public struct ExtensionManifest: Equatable {
     /// Sites the extension can read and change: host permissions plus content script matches.
     public var hostPermissions: [String]
     public var isTheme: Bool
+    /// Has a toolbar button ("action", "browser_action" or "page_action"). Extensions without
+    /// one, such as ones that only run content scripts, have nothing to click.
+    public var hasToolbarButton: Bool = true
     /// The largest icon, relative to the extension's folder.
     public var iconPath: String?
 
@@ -78,6 +81,7 @@ public struct ExtensionManifest: Equatable {
             optionalPermissions: unique((manifest["optional_permissions"] as? [Any] ?? []).compactMap { $0 as? String }.filter { !isHostPattern($0) }),
             hostPermissions: unique(hosts),
             isTheme: manifest["theme"] != nil,
+            hasToolbarButton: ["action", "browser_action", "page_action"].contains { manifest[$0] != nil },
             iconPath: icons?.1
         )
     }
