@@ -56,7 +56,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         self.profileID = profileID
         self.palette = StripPalette(color: appDelegate.config.titleBarColor)
 
-        let window = NSWindow(
+        let window = BrowserWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
@@ -1050,5 +1050,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(showNextTab(_:)), #selector(showPreviousTab(_:)): return tabs.count > 1
         default: return true
         }
+    }
+}
+
+/// A browser window that doesn't beep at keys nothing handled. Web pages pass up keys they
+/// don't use, such as the arrow keys on a page that can't scroll, and AppKit beeps when no
+/// one takes them. Browsers stay quiet.
+final class BrowserWindow: NSWindow {
+    override func noResponder(for eventSelector: Selector) {
+        if eventSelector == #selector(NSResponder.keyDown(with:)) { return }
+        super.noResponder(for: eventSelector)
     }
 }
