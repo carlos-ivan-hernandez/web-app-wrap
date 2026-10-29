@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds "dist/WebAppWrap.app" and copies it into /Applications.
+# Builds "dist/WebAppWrap.app". App Installer (~/main/dev/repos/app-installer) copies it into
+# /Applications.
 # UNIVERSAL=1 builds for both Apple silicon and Intel (requires full Xcode, not just the command line tools).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -52,12 +53,3 @@ xattr -cr "$app"
 codesign --force --sign - "$app/Contents/Resources/WebAppWrapRuntime"
 codesign --force --sign - "$app"
 echo "Built $app (version ${commit:-none})"
-
-rm -rf "/Applications/WebAppWrap.app"
-cp -R "$app" /Applications/
-echo "Installed /Applications/WebAppWrap.app"
-for old in "/Applications/Web App Wrap.app" /Applications/WebWrap.app; do
-  if [[ -d "$old" ]]; then
-    echo "Note: the old $old is still installed; you can delete it."
-  fi
-done

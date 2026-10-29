@@ -159,7 +159,7 @@ Generated apps need nothing extra. Each one includes everything it needs.
 ## Build
 
 ```bash
-./scripts/build.sh            # creates dist/WebAppWrap.app, versioned with the current commit, and copies it into /Applications
+./scripts/build.sh            # creates dist/WebAppWrap.app, versioned with the current commit; App Installer copies it into /Applications
 UNIVERSAL=1 ./scripts/build.sh  # Apple silicon + Intel (needs full Xcode)
 ```
 
